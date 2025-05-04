@@ -1,7 +1,9 @@
 package dev.cerios.maugame.websocket.handler;
 
+import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.service.GameService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -11,12 +13,17 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 @Component
 @RequiredArgsConstructor
 public class GameHandler extends TextWebSocketHandler {
-
-    private final GameService gameService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        super.afterConnectionEstablished(session);
+        final String playerId = session.getAttributes().get("playerId").toString();
+        if (playerId == null)
+            return;
+
+        // TODO validate player
+
+        eventPublisher.publishEvent(new RegisterEvent(this, session, playerId));
     }
 
     @Override

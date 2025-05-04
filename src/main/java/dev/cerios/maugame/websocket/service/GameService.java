@@ -3,8 +3,12 @@ package dev.cerios.maugame.websocket.service;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.action.Action;
 import dev.cerios.maugame.websocket.ActionDistributor;
+import dev.cerios.maugame.websocket.event.DistributeEvent;
+import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.storage.GameStorage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -16,12 +20,12 @@ import java.util.List;
 public class GameService {
 
     private final GameStorage gameStorage;
-    private final ActionDistributor actionDistributor;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public void registerPlayer(String player) throws IOException {
+    @EventListener
+    public void registerPlayer(RegisterEvent event) throws IOException {
         List<Action> actions = new LinkedList<>();
-
-        var game = gameStorage.addPlayerToLatestGame(player, actions);
+        var game = gameStorage.addPlayerToLatestGame(event.getPlayerId(), actions);
 
         if (game.getFreeCapacity() == 0) {
             try {
@@ -31,6 +35,11 @@ public class GameService {
             }
         }
 
-        actionDistributor.distribute(game.getAllPlayers(), actions);
+        eventPublisher.publishEvent(new DistributeEvent(this, game.getAllPlayers(), actions));
+    }
+
+//    @EventListener
+    public synchronized void onPlayerMove() {
+
     }
 }
