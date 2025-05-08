@@ -2,7 +2,6 @@ package dev.cerios.maugame.websocket.service;
 
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.action.Action;
-import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.websocket.event.DistributeEvent;
 import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.storage.GameStorage;
@@ -23,7 +22,7 @@ public class GameService {
     private final ApplicationEventPublisher eventPublisher;
 
     @EventListener
-    public void registerPlayer(RegisterEvent event) throws IOException {
+    public void registerPlayer(RegisterEvent event) {
         List<Action> actions = new LinkedList<>();
         var game = gameStorage.addPlayerToLatestGame(event.getPlayerId(), actions);
 
@@ -35,11 +34,11 @@ public class GameService {
             }
         }
 
-        eventPublisher.publishEvent(new DistributeEvent(this, game.getAllPlayers().stream().map(Player::getPlayerId).toList(), actions));
+        eventPublisher.publishEvent(new DistributeEvent(this, game.getAllPlayers(), actions));
     }
 
 //    @EventListener
-    public synchronized void onPlayerMove() {
-
+    public synchronized void onPlayerMove(String message) {
+        System.out.println(message);
     }
 }

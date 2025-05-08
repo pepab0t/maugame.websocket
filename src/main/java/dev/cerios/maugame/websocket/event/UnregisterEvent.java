@@ -7,10 +7,10 @@ import lombok.ToString;
 @ToString
 public class UnregisterEvent extends CustomApplicationEvent {
 
-    private final String playerId;
+    private final String sessionId;
 
-    public UnregisterEvent(Object source, String playerId) {
+    public UnregisterEvent(Object source, String sessionId) {
         super(source);
-        this.playerId = playerId;
+        this.sessionId = sessionId;
     }
 }

@@ -16,8 +16,4 @@ public class AppConfig {
         return new GameFactory();
     }
 
-    @Bean
-    public Map<String, WebSocketSession> playerToSession() {
-        return new ConcurrentHashMap<>();
-    }
 }

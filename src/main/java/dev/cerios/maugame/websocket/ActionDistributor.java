@@ -36,8 +36,8 @@ public class ActionDistributor {
 
     @EventListener
     public synchronized void onUnregister(UnregisterEvent event) throws IOException {
-        var session = playerToSession.remove(event.getPlayerId());
-        sessionToPlayer.remove(session.getId());
+        var playerId = sessionToPlayer.remove(event.getSessionId());
+        var session = playerToSession.remove(playerId);
         if (session.isOpen())
             session.close();
     }
