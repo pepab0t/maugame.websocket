@@ -1,7 +1,7 @@
 package dev.cerios.maugame.websocket.mapper;
 
 import dev.cerios.maugame.mauengine.game.action.DrawAction;
-import dev.cerios.maugame.websocket.dto.HiddenDrawAction;
+import dev.cerios.maugame.websocket.serveraction.HiddenDrawAction;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

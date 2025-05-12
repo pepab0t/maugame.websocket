@@ -2,6 +2,7 @@ package dev.cerios.maugame.websocket.service;
 
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.action.Action;
+import dev.cerios.maugame.websocket.event.DisablePlayerEvent;
 import dev.cerios.maugame.websocket.event.DistributeEvent;
 import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.storage.GameStorage;
@@ -35,6 +36,13 @@ public class GameService {
         }
 
         eventPublisher.publishEvent(new DistributeEvent(this, game.getAllPlayers(), actions));
+    }
+
+    @EventListener
+    public synchronized void disablePlayer(DisablePlayerEvent event) {
+        var game = gameStorage.getPlayersGame(event.getPlayerId());
+        game.deactivatePlayer(event.getPlayerId());
+        eventPublisher.publishEvent(new DistributeEvent(this, game.getAllPlayers(), null));
     }
 
 //    @EventListener

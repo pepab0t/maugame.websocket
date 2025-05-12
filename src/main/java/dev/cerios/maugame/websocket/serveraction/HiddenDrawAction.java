@@ -1,4 +1,4 @@
-package dev.cerios.maugame.websocket.dto;
+package dev.cerios.maugame.websocket.serveraction;
 
 import dev.cerios.maugame.mauengine.game.action.Action;
 

@@ -2,6 +2,7 @@ package dev.cerios.maugame.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerios.maugame.mauengine.game.action.DrawAction;
+import dev.cerios.maugame.websocket.event.DisablePlayerEvent;
 import dev.cerios.maugame.websocket.event.DistributeEvent;
 import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.event.UnregisterEvent;
@@ -35,11 +36,12 @@ public class ActionDistributor {
     }
 
     @EventListener
-    public synchronized void onUnregister(UnregisterEvent event) throws IOException {
+    public synchronized DisablePlayerEvent onUnregister(UnregisterEvent event) throws IOException {
         var playerId = sessionToPlayer.remove(event.getSessionId());
         var session = playerToSession.remove(playerId);
         if (session.isOpen())
             session.close();
+        return new DisablePlayerEvent(this, playerId);
     }
 
 
