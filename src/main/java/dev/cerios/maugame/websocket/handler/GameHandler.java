@@ -1,11 +1,11 @@
 package dev.cerios.maugame.websocket.handler;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.event.UnregisterEvent;
-import dev.cerios.maugame.websocket.service.GameService;
+import dev.cerios.maugame.websocket.request.RequestProcessor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.lang.NonNullApi;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -16,7 +16,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 @RequiredArgsConstructor
 public class GameHandler extends TextWebSocketHandler {
     private final ApplicationEventPublisher eventPublisher;
-    private final GameService gameService;
+    private final RequestProcessor requestProcessor;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -35,8 +35,7 @@ public class GameHandler extends TextWebSocketHandler {
     }
 
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        super.handleTextMessage(session, message);
-        gameService.onPlayerMove(message.getPayload());
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        requestProcessor.process(session, message.getPayload());
     }
 }

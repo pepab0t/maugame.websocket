@@ -7,6 +7,7 @@ import dev.cerios.maugame.websocket.event.DistributeEvent;
 import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.event.UnregisterEvent;
 import dev.cerios.maugame.websocket.mapper.DrawActionMapper;
+import dev.cerios.maugame.websocket.response.ActionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,22 @@ public class ActionDistributor {
     private final DrawActionMapper drawActionMapper;
 
     private final ObjectMapper jsonMapper = new ObjectMapper();
+
+    public synchronized String getPlayerBySession(String sessionId) {
+        String player = sessionToPlayer.get(sessionId);
+        if (player == null) {
+            throw new RuntimeException("no player found for session " + sessionId);
+        }
+        return player;
+    }
+
+    public synchronized WebSocketSession getSessionByPlayer(String player) {
+        var session = playerToSession.get(player);
+        if (session == null) {
+            throw new RuntimeException("no player found for session " + player);
+        }
+        return session;
+    }
 
     @EventListener
     public synchronized void onRegister(RegisterEvent event) {
@@ -51,15 +68,16 @@ public class ActionDistributor {
             var session = playerToSession.get(player);
             if (session == null) continue;
 
-            var messages = event.getActions().stream()
+            var actions = event.getActions().stream()
                     .map(action -> action instanceof DrawAction drawAction && !drawAction.playerId().equals(player) ?
                             drawActionMapper.toHidden(drawAction) :
                             action
                     )
                     .toList();
+            var response = new ActionResponse(actions);
 
             try {
-                session.sendMessage(new TextMessage(jsonMapper.writeValueAsString(messages)));
+                session.sendMessage(new TextMessage(jsonMapper.writeValueAsString(response)));
             } catch (IOException ignore) {
             }
         }
