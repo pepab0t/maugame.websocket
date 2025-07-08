@@ -1,11 +1,6 @@
-package dev.cerios.maugame.websocket.handler;
+package dev.cerios.maugame.websocket.wshandler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.cerios.maugame.websocket.event.RegisterEvent;
-import dev.cerios.maugame.websocket.event.UnregisterEvent;
-import dev.cerios.maugame.websocket.request.RequestProcessor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;

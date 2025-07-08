@@ -3,22 +3,19 @@ package dev.cerios.maugame.websocket;
 import dev.cerios.maugame.websocket.event.DistributeEvent;
 import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.event.UnregisterEvent;
-import dev.cerios.maugame.websocket.service.GameService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.EventListener;
 
 @SpringBootApplication
 public class MauWebsocketApplication {
     public static void main(String[] args) {
         var app = SpringApplication.run(MauWebsocketApplication.class, args);
-//        app.stop();
     }
 
-//    @Bean
+    //    @Bean
     public CommandLineRunner commandLineRunner(ApplicationEventPublisher eventPublisher) {
         return args -> {
             eventPublisher.publishEvent(new RegisterEvent(this, null, "jose"));

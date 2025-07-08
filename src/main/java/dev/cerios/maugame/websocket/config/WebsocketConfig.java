@@ -1,6 +1,6 @@
 package dev.cerios.maugame.websocket.config;
 
-import dev.cerios.maugame.websocket.handler.GameHandler;
+import dev.cerios.maugame.websocket.wshandler.GameHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
