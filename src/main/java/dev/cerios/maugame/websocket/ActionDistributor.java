@@ -6,7 +6,6 @@ import dev.cerios.maugame.websocket.event.DisablePlayerEvent;
 import dev.cerios.maugame.websocket.event.DistributeEvent;
 import dev.cerios.maugame.websocket.event.RegisterEvent;
 import dev.cerios.maugame.websocket.event.UnregisterEvent;
-import dev.cerios.maugame.websocket.mapper.DrawActionMapper;
 import dev.cerios.maugame.websocket.response.ActionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -23,8 +22,6 @@ import java.util.Map;
 public class ActionDistributor {
     private final Map<String, WebSocketSession> playerToSession = new HashMap<>();
     private final Map<String, String> sessionToPlayer = new HashMap<>();
-
-    private final DrawActionMapper drawActionMapper;
 
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
@@ -68,13 +65,7 @@ public class ActionDistributor {
             var session = playerToSession.get(player);
             if (session == null) continue;
 
-            var actions = event.getActions().stream()
-                    .map(action -> action instanceof DrawAction drawAction && !drawAction.playerId().equals(player) ?
-                            drawActionMapper.toHidden(drawAction) :
-                            action
-                    )
-                    .toList();
-            var response = new ActionResponse(actions);
+            var response = new ActionResponse(event.getActions());
 
             try {
                 session.sendMessage(new TextMessage(jsonMapper.writeValueAsString(response)));

@@ -12,9 +12,9 @@ import java.util.List;
 @ToString
 public class DistributeEvent extends CustomApplicationEvent {
     private final Collection<String> players;
-    private final Collection<Action> actions;
+    private final List<Action> actions;
 
-    public DistributeEvent(Object source, Collection<String> players, Collection<Action> actions) {
+    public DistributeEvent(Object source, Collection<String> players, List<Action> actions) {
         super(source);
         this.players = players;
         this.actions = actions;
