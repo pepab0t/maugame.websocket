@@ -15,27 +15,16 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 @Component
 @RequiredArgsConstructor
 public class GameHandler extends TextWebSocketHandler {
-    private final ApplicationEventPublisher eventPublisher;
-    private final RequestProcessor requestProcessor;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        final String playerId = session.getAttributes().get("playerId").toString();
-        if (playerId == null)
-            return;
-
-        // TODO validate player
-
-        eventPublisher.publishEvent(new RegisterEvent(this, session, playerId));
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        eventPublisher.publishEvent(new UnregisterEvent(this, session.getId()));
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        requestProcessor.process(session, message.getPayload());
     }
 }

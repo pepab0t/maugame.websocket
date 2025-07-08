@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
@@ -13,7 +14,6 @@ public class AppConfig {
 
     @Bean
     public GameFactory gameFactory() {
-        return new GameFactory();
+        return new GameFactory(new Random());
     }
-
 }
