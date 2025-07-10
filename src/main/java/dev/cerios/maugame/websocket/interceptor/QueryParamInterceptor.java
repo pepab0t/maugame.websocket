@@ -1,4 +1,4 @@
-package dev.cerios.maugame.websocket.config;
+package dev.cerios.maugame.websocket.interceptor;
 
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
@@ -17,17 +17,21 @@ public class QueryParamInterceptor implements HandshakeInterceptor {
         URI uri = request.getURI();
         String query = uri.getQuery(); // token=abc123
 
+        boolean userParamFound = false;
         if (query != null) {
             String[] pairs = query.split("&");
             for (String pair : pairs) {
                 String[] parts = pair.split("=");
                 if (parts.length == 2) {
                     attributes.put(parts[0], parts[1]);
+                    if (parts[0].equals("user")) {
+                        userParamFound = true;
+                    }
                 }
             }
         }
 
-        return true;
+        return userParamFound;
     }
 
     @Override
