@@ -11,8 +11,8 @@ import lombok.Getter;
 public class PlayCardActionDto extends PlayerActionDto {
     private final Card card;
 
-    public PlayCardActionDto(Action.ActionType actionType, PlayerDto playerDto, Card card) {
-        super(actionType, playerDto);
+    public PlayCardActionDto(Action.ActionType type, PlayerDto playerDto, Card card) {
+        super(type, playerDto);
         this.card = card;
     }
 }

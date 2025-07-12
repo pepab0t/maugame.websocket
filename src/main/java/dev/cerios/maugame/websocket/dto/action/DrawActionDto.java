@@ -14,8 +14,8 @@ import java.util.List;
 public class DrawActionDto extends ActionDto {
     private final List<Card> cards;
 
-    public DrawActionDto(Action.ActionType actionType, List<Card> cards) {
-        super(actionType);
+    public DrawActionDto(Action.ActionType type, List<Card> cards) {
+        super(type);
         this.cards = Collections.unmodifiableList(cards);
     }
 }

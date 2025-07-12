@@ -3,9 +3,6 @@ package dev.cerios.maugame.websocket.request;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.cerios.maugame.websocket.event.PlayerDrawEvent;
-import dev.cerios.maugame.websocket.event.PlayerPassEvent;
-import dev.cerios.maugame.websocket.event.PlayerPlayEvent;
 import dev.cerios.maugame.websocket.exception.InvalidCommandException;
 import dev.cerios.maugame.websocket.mapper.ExceptionMapper;
 import lombok.RequiredArgsConstructor;
@@ -32,11 +29,11 @@ public class RequestProcessor {
 
             switch (requestType) {
                 case PLAY -> {
-                    var playRequest = objectMapper.treeToValue(root, PlayRequest.class);
-                    eventPublisher.publishEvent(new PlayerPlayEvent(this, session, playRequest));
                 }
-                case DRAW -> eventPublisher.publishEvent(new PlayerDrawEvent(this, session));
-                case PASS -> eventPublisher.publishEvent(new PlayerPassEvent(this, session));
+                case DRAW -> {
+                }
+                case PASS -> {
+                }
             };
         } catch (JsonProcessingException | InvalidCommandException e) {
             try {

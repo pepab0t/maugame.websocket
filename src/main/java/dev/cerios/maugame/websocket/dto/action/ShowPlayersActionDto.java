@@ -11,8 +11,8 @@ import java.util.List;
 public class ShowPlayersActionDto extends ActionDto {
     private final List<String> players;
 
-    public ShowPlayersActionDto(Action.ActionType actionType, List<String> players) {
-        super(actionType);
+    public ShowPlayersActionDto(Action.ActionType type, List<String> players) {
+        super(type);
         this.players = players;
     }
 }

@@ -5,5 +5,5 @@ import lombok.Data;
 
 @Data
 public class ActionDto {
-    private final Action.ActionType actionType;
+    private final Action.ActionType type;
 }

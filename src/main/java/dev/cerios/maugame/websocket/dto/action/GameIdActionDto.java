@@ -9,8 +9,8 @@ import lombok.Getter;
 public class GameIdActionDto extends ActionDto {
     private final String gameId;
 
-    public GameIdActionDto(Action.ActionType actionType, String gameId) {
-        super(actionType);
+    public GameIdActionDto(Action.ActionType type, String gameId) {
+        super(type);
         this.gameId = gameId;
     }
 }

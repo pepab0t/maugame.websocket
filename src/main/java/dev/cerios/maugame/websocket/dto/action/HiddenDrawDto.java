@@ -10,8 +10,8 @@ import lombok.Getter;
 public class HiddenDrawDto extends PlayerActionDto {
     private final int count;
 
-    public HiddenDrawDto(Action.ActionType actionType, PlayerDto playerDto, int count) {
-        super(actionType, playerDto);
+    public HiddenDrawDto(Action.ActionType type, PlayerDto playerDto, int count) {
+        super(type, playerDto);
         this.count = count;
     }
 }

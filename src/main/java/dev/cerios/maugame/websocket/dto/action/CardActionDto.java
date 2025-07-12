@@ -10,8 +10,8 @@ import lombok.Getter;
 public class CardActionDto extends ActionDto {
     private final Card card;
 
-    public CardActionDto(Action.ActionType actionType, Card card) {
-        super(actionType);
+    public CardActionDto(Action.ActionType type, Card card) {
+        super(type);
         this.card = card;
     }
 }

@@ -7,13 +7,12 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter
-@Setter
 @EqualsAndHashCode(callSuper = true)
 public class PlayerActionDto extends ActionDto {
     private final PlayerDto playerDto;
 
-    public PlayerActionDto(Action.ActionType actionType, PlayerDto playerDto) {
-        super(actionType);
+    public PlayerActionDto(Action.ActionType type, PlayerDto playerDto) {
+        super(type);
         this.playerDto = playerDto;
     }
 }
