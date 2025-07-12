@@ -21,29 +21,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GameManager {
     private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
     private final GameFactory gameFactory;
-    private final SessionGameBridge bridge;
-    private final ObjectMapper objectMapper;
+    private final MauSettings mauSettings;
+    private final ActionDistributor actionDistributor;
 
     private Game currentGame;
 
     public Player registerPlayer(String username) {
         if (currentGame == null || currentGame.getFreeCapacity() == 0) {
-            currentGame = gameFactory.createGame();
+            currentGame = gameFactory.createGame(2, mauSettings.getMaxPlayers());
         }
+        System.out.println(currentGame.getUuid());
         Player player;
         try {
-            player = currentGame.registerPlayer(username, (p, e) -> {
-                Thread.ofVirtual().start(() -> {
-                    synchronized (this) {
-                        var session = bridge.getSession(p);
-                        try {
-                            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(e)));
-                        } catch (IOException ex) {
-                            log.warn("cannot send proper message", ex);
-                        }
-                    }
-                });
-            });
+            player = currentGame.registerPlayer(username, actionDistributor::distribute);
         } catch (GameException e) {
             throw new RuntimeException(e);
         }
