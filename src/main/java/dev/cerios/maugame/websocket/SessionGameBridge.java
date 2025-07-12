@@ -25,6 +25,23 @@ public class SessionGameBridge {
         }
     }
 
+    public Player getPlayer(String sessionId) {
+        var player = sessionToPlayer.get(sessionId);
+        if (player == null) {
+            throw new RuntimeException("Unexpected error: player should exist for session " + sessionId);
+        }
+        return player;
+    }
+
+    public Player dropSession(String sessionId) {
+        var player = sessionToPlayer.remove(sessionId);
+        if (player == null) {
+            throw new IllegalStateException("Unexpected error: session does not exist for session " + sessionId);
+        }
+        playerToSession.remove(player);
+        return player;
+    }
+
     public void registerSession(Player player, WebSocketSession session) {
         var sessionFuture = playerToSession.computeIfAbsent(player.getPlayerId(), k -> new CompletableFuture<>());
         sessionToPlayer.put(session.getId(), player);

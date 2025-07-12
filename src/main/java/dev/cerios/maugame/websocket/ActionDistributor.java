@@ -30,8 +30,8 @@ public class ActionDistributor {
             var session = bridge.getSession(player);
             try {
                 lock.lock();
-                var json = objectMapper.writeValueAsString(action);
-                session.sendMessage(new TextMessage(json));
+                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(action)));
+                System.out.println(action);
             } catch (IOException ex) {
                 log.warn("cannot send proper message", ex);
             } finally {

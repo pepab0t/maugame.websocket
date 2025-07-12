@@ -27,6 +27,8 @@ public class GameHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        var player = bridge.dropSession(session.getId());
+        gameManager.disconnectPlayer(player);
     }
 
     @Override
