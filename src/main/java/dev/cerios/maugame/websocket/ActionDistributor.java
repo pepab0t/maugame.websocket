@@ -31,7 +31,6 @@ public class ActionDistributor {
             try {
                 lock.lock();
                 session.sendMessage(new TextMessage(objectMapper.writeValueAsString(action)));
-                System.out.println(action);
             } catch (IOException ex) {
                 log.warn("cannot send proper message", ex);
             } finally {
