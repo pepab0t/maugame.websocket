@@ -1,85 +1,87 @@
 package dev.cerios.maugame.websocket;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.cerios.maugame.mauengine.game.action.DrawAction;
-import dev.cerios.maugame.websocket.event.DisablePlayerEvent;
-import dev.cerios.maugame.websocket.event.DistributeEvent;
-import dev.cerios.maugame.websocket.event.RegisterEvent;
-import dev.cerios.maugame.websocket.event.UnregisterEvent;
-import dev.cerios.maugame.websocket.mapper.DrawActionMapper;
-import dev.cerios.maugame.websocket.response.ActionResponse;
+import dev.cerios.maugame.mauengine.game.Player;
+import dev.cerios.maugame.mauengine.game.action.*;
+import dev.cerios.maugame.websocket.dto.action.ActionDto;
+import dev.cerios.maugame.websocket.mapper.ActionMapper;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.event.EventListener;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class ActionDistributor {
-    private final Map<String, WebSocketSession> playerToSession = new HashMap<>();
-    private final Map<String, String> sessionToPlayer = new HashMap<>();
 
-    private final DrawActionMapper drawActionMapper;
+    @Qualifier("actionService")
+    private final ExecutorService executor;
+    private final SessionGameBridge bridge;
+    private final ObjectMapper objectMapper;
+    private final ActionMapper actionMapper;
+    private final Lock lock = new ReentrantLock();
+    private final Semaphore semaphore = new Semaphore(1);
 
-    private final ObjectMapper jsonMapper = new ObjectMapper();
-
-    public synchronized String getPlayerBySession(String sessionId) {
-        String player = sessionToPlayer.get(sessionId);
-        if (player == null) {
-            throw new RuntimeException("no player found for session " + sessionId);
-        }
-        return player;
-    }
-
-    public synchronized WebSocketSession getSessionByPlayer(String player) {
-        var session = playerToSession.get(player);
-        if (session == null) {
-            throw new RuntimeException("no player found for session " + player);
-        }
-        return session;
-    }
-
-    @EventListener
-    public synchronized void onRegister(RegisterEvent event) {
-        if (event.getSession() == null)
-            return;
-        playerToSession.put(event.getPlayerId(), event.getSession());
-        sessionToPlayer.put(event.getSession().getId(), event.getPlayerId());
-    }
-
-    @EventListener
-    public synchronized DisablePlayerEvent onUnregister(UnregisterEvent event) throws IOException {
-        var playerId = sessionToPlayer.remove(event.getSessionId());
-        var session = playerToSession.remove(playerId);
-        if (session.isOpen())
-            session.close();
-        return new DisablePlayerEvent(this, playerId);
-    }
-
-
-    @EventListener
-    public synchronized void onDistribute(DistributeEvent event) {
-        for (var player : event.getPlayers()) {
-            var session = playerToSession.get(player);
-            if (session == null) continue;
-
-            var actions = event.getActions().stream()
-                    .map(action -> action instanceof DrawAction drawAction && !drawAction.playerId().equals(player) ?
-                            drawActionMapper.toHidden(drawAction) :
-                            action
-                    )
-                    .toList();
-            var response = new ActionResponse(actions);
-
+    public void distribute(Player player, Action action) {
+        executor.execute(() -> {
+            // player lock
+            var playerLock = bridge.getPlayerLock(player.getPlayerId());
+            ActionDto dto;
+            WebSocketSession session;
             try {
-                session.sendMessage(new TextMessage(jsonMapper.writeValueAsString(response)));
-            } catch (IOException ignore) {
+                playerLock.lock();
+                session = bridge.getSession(player);
+                dto = mapAction(action);
+                TextMessage message;
+                message = new TextMessage(objectMapper.writeValueAsString(dto));
+                sendMessage(session, message);
+            } catch (JsonProcessingException e) {
+                log.info("error during serialization", e);
+            } finally {
+                playerLock.unlock();
             }
+        });
+    }
+
+    private void sendMessage(WebSocketSession session, TextMessage message) {
+        try {
+            lock.lock();
+            session.sendMessage(message);
+        } catch (IOException | IllegalStateException ex) {
+        } finally {
+            lock.unlock();
         }
+    }
+
+    private ActionDto mapAction(Action action) {
+        return switch (action) {
+            case ActivateAction a -> actionMapper.toDto(a);
+            case DeactivateAction a -> actionMapper.toDto(a);
+            case DrawAction a -> actionMapper.toDto(a);
+            case EndAction a -> actionMapper.toDto(a);
+            case HiddenDrawAction a -> actionMapper.toDto(a);
+            case LoseAction a -> actionMapper.toDto(a);
+            case PassAction a -> actionMapper.toDto(a);
+            case PlayCardAction a -> actionMapper.toDto(a);
+            case PlayersAction a -> actionMapper.toDto(a);
+            case PlayerShiftAction a -> actionMapper.toDto(a);
+            case RegisterAction a -> actionMapper.toDto(a);
+            case RemovePlayerAction a -> actionMapper.toDto(a);
+            case SendRankAction a -> actionMapper.toDto(a);
+            case StartAction a -> actionMapper.toDto(a);
+            case StartPileAction a -> actionMapper.toDto(a);
+            case WinAction a -> actionMapper.toDto(a);
+            default -> throw new IllegalStateException("Unexpected value: " + action);
+        };
     }
 }
