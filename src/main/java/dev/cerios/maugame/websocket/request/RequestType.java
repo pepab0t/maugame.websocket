@@ -3,7 +3,9 @@ package dev.cerios.maugame.websocket.request;
 import dev.cerios.maugame.websocket.exception.InvalidCommandException;
 
 public enum RequestType {
-    PLAY, DRAW, PASS;
+    PLAY,
+    DRAW,
+    PASS;
 
     public static RequestType fromString(String type) throws InvalidCommandException {
         try {

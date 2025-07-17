@@ -1,7 +1,6 @@
 package dev.cerios.maugame.websocket.response;
 
 public enum ResponseType {
-    GAME_ACTION,
+    ACTION,
     ERROR,
-    SERVER_MESSAGE
 }
