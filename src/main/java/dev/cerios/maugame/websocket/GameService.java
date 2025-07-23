@@ -1,20 +1,22 @@
 package dev.cerios.maugame.websocket;
 
+import dev.cerios.maugame.mauengine.card.Card;
+import dev.cerios.maugame.mauengine.card.Color;
 import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.WebSocketSession;
+import org.springframework.stereotype.Service;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Component
+@Service
 @RequiredArgsConstructor
 @Slf4j
-public class GameManager {
+public class GameService {
     private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
     private final GameFactory gameFactory;
     private final MauSettings mauSettings;
@@ -47,15 +49,35 @@ public class GameManager {
         var game = playerToGame.get(player.getPlayerId());
         try {
             switch (game.getStage()) {
-                case RUNNING -> {
-                    game.deactivatePlayer(player.getPlayerId());
-                }
-                case LOBBY -> {
-                    game.removePlayer(player.getPlayerId());
-                }
+                case RUNNING -> game.deactivatePlayer(player.getPlayerId());
+                case LOBBY -> game.removePlayer(player.getPlayerId());
             }
         }  catch (GameException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    public void playCard(Player player, Card card, Color nextColor) throws MauEngineBaseException {
+        var game = playerToGame.get(player.getPlayerId());
+        if (game == null) {
+            throw new RuntimeException("No game"); // TODO think about handling no game
+        }
+        game.playCardMove(player.getPlayerId(), card, nextColor);
+    }
+
+    public void drawCard(Player player) throws MauEngineBaseException {
+        var game = playerToGame.get(player.getPlayerId());
+        if (game == null) {
+            throw new RuntimeException("No game"); // TODO think about handling no game
+        }
+        game.playDrawMove(player.getPlayerId());
+    }
+
+    public void pass(Player player) throws MauEngineBaseException {
+        var game = playerToGame.get(player.getPlayerId());
+        if (game == null) {
+            throw new RuntimeException("No game"); // TODO think about handling no game
+        }
+        game.playPassMove(player.getPlayerId());
     }
 }
