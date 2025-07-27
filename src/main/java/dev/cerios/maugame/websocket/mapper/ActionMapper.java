@@ -1,5 +1,6 @@
 package dev.cerios.maugame.websocket.mapper;
 
+import dev.cerios.maugame.mauengine.card.CardType;
 import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.mauengine.game.action.*;
 import dev.cerios.maugame.websocket.dto.action.*;
@@ -11,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.mapstruct.MappingConstants.ComponentModel.SPRING;
 
-@Mapper(componentModel = SPRING)
+@Mapper(componentModel = SPRING, imports = CardType.class)
 public abstract class ActionMapper {
     @Autowired
     protected PlayerMapper playerMapper;
@@ -38,6 +39,7 @@ public abstract class ActionMapper {
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
     @Mapping(target = "type", source = "action", qualifiedByName = "typeGetter")
+    @Mapping(target = "nextColor", expression = "java(action.card().type() == CardType.QUEEN ? action.nextColor() : null)")
     public abstract PlayCardActionDto toDto(PlayCardAction action);
 
     @Mapping(target = "players", expression = "java(action.players().stream().map(p -> p.getUsername()).toList())")
