@@ -5,59 +5,77 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.mauengine.game.action.*;
 import dev.cerios.maugame.websocket.dto.action.ActionDto;
+import dev.cerios.maugame.websocket.event.ClearPlayerEvent;
+import dev.cerios.maugame.websocket.exception.MauTimeoutException;
 import dev.cerios.maugame.websocket.mapper.ActionMapper;
+import dev.cerios.maugame.websocket.message.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import static dev.cerios.maugame.mauengine.game.action.Action.ActionType.END_GAME;
+import static dev.cerios.maugame.websocket.SessionGameBridge.PlayerConcurrentSources;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class ActionDistributor {
 
-    @Qualifier("actionService")
     private final ExecutorService executor;
     private final SessionGameBridge bridge;
     private final ObjectMapper objectMapper;
     private final ActionMapper actionMapper;
+    private final ApplicationEventPublisher publisher;
+
     private final Lock lock = new ReentrantLock();
-    private final Semaphore semaphore = new Semaphore(1);
 
     public void distribute(Player player, Action action) {
-        executor.execute(() -> {
-            // player lock
-            var playerLock = bridge.getPlayerLock(player.getPlayerId());
-            ActionDto dto;
-            WebSocketSession session;
-            try {
-                playerLock.lock();
-                session = bridge.getSession(player);
-                dto = mapAction(action);
-                TextMessage message;
-                message = new TextMessage(objectMapper.writeValueAsString(dto));
-                sendMessage(session, message);
-            } catch (JsonProcessingException e) {
-                log.info("error during serialization", e);
-            } finally {
-                playerLock.unlock();
-            }
-        });
+        var ps = bridge.getPlayerSources(player.getPlayerId());
+        try {
+            executor.execute(() -> distributeAction(ps, player));
+            ps.queue().put(action);
+        } catch (RejectedExecutionException | InterruptedException e) {
+            log.info("distribution {} to player {} rejected", action, player);
+        }
+    }
+
+    private void distributeAction(PlayerConcurrentSources ps, Player player) {
+        try {
+            ps.lock().lock();
+            var a = ps.queue().take();
+            var session = bridge.getSession(player);
+            var dto = mapAction(a);
+
+            sendMessage(
+                    session,
+                    new TextMessage(objectMapper.writeValueAsString(Message.createActionMessage(dto)))
+            );
+
+            if (a.getType() == END_GAME)
+                publisher.publishEvent(new ClearPlayerEvent(this, session.getId(), player));
+        } catch (JsonProcessingException e) {
+            log.info("error during serialization", e);
+        } catch (MauTimeoutException | InterruptedException ignore) {
+        } finally {
+            ps.lock().unlock();
+        }
     }
 
     private void sendMessage(WebSocketSession session, TextMessage message) {
         try {
             lock.lock();
             session.sendMessage(message);
-        } catch (IOException | IllegalStateException ex) {
+        } catch (IOException | IllegalStateException exception) {
+            log.debug("error sending message {}", exception.getMessage());
         } finally {
             lock.unlock();
         }

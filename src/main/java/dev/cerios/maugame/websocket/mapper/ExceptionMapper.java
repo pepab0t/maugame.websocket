@@ -1,10 +1,10 @@
 package dev.cerios.maugame.websocket.mapper;
 
-import dev.cerios.maugame.websocket.response.ErrorResponse;
+import dev.cerios.maugame.websocket.message.ErrorMessage;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
 public interface ExceptionMapper {
 
-    ErrorResponse toErrorResponse(Exception exception);
+    ErrorMessage toErrorResponse(Exception exception);
 }

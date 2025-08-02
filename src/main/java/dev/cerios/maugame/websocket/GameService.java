@@ -4,10 +4,13 @@ import dev.cerios.maugame.mauengine.card.Card;
 import dev.cerios.maugame.mauengine.card.Color;
 import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
-import dev.cerios.maugame.mauengine.game.*;
+import dev.cerios.maugame.mauengine.game.Game;
+import dev.cerios.maugame.mauengine.game.GameFactory;
+import dev.cerios.maugame.mauengine.game.Player;
+import dev.cerios.maugame.websocket.event.ClearPlayerEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -46,15 +49,15 @@ public class GameService {
     }
 
     public void disconnectPlayer(Player player) {
-        var game = playerToGame.get(player.getPlayerId());
         try {
+            var game = playerToGame.remove(player.getPlayerId());
             switch (game.getStage()) {
                 case RUNNING -> game.deactivatePlayer(player.getPlayerId());
                 case LOBBY -> game.removePlayer(player.getPlayerId());
             }
-        }  catch (GameException e) {
+        } catch (GameException e) {
             throw new IllegalStateException(e);
-        }
+        } catch (NullPointerException ignore) {}
     }
 
     public void playCard(Player player, Card card, Color nextColor) throws MauEngineBaseException {
@@ -79,5 +82,10 @@ public class GameService {
             throw new RuntimeException("No game"); // TODO think about handling no game
         }
         game.playPassMove(player.getPlayerId());
+    }
+
+    @EventListener
+    public void handleClearEvent(ClearPlayerEvent event) {
+        playerToGame.remove(event.getPlayer().getPlayerId());
     }
 }
