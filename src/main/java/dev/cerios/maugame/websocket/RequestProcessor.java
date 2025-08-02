@@ -25,7 +25,7 @@ public class RequestProcessor {
 
     private final ObjectMapper objectMapper;
     private final ExceptionMapper exceptionMapper;
-    private final SessionGameBridge bridge;
+    private final PlayerSessionStorage bridge;
     private final GameService gameService;
 
     public void process(WebSocketSession session, String request) {

@@ -23,7 +23,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static dev.cerios.maugame.mauengine.game.action.Action.ActionType.END_GAME;
-import static dev.cerios.maugame.websocket.SessionGameBridge.PlayerConcurrentSources;
+import static dev.cerios.maugame.websocket.PlayerSessionStorage.PlayerConcurrentSources;
 
 @Component
 @RequiredArgsConstructor
@@ -31,7 +31,7 @@ import static dev.cerios.maugame.websocket.SessionGameBridge.PlayerConcurrentSou
 public class ActionDistributor {
 
     private final ExecutorService executor;
-    private final SessionGameBridge bridge;
+    private final PlayerSessionStorage bridge;
     private final ObjectMapper objectMapper;
     private final ActionMapper actionMapper;
     private final ApplicationEventPublisher publisher;

@@ -18,7 +18,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 @Component
 @Slf4j
-public class SessionGameBridge {
+public class PlayerSessionStorage {
 
     private final Map<String, CompletableFuture<WebSocketSession>> playerToSession = new ConcurrentHashMap<>();
     private final Map<String, Player> sessionToPlayer = new ConcurrentHashMap<>();

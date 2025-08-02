@@ -2,7 +2,7 @@ package dev.cerios.maugame.websocket.wshandler;
 
 import dev.cerios.maugame.websocket.GameService;
 import dev.cerios.maugame.websocket.RequestProcessor;
-import dev.cerios.maugame.websocket.SessionGameBridge;
+import dev.cerios.maugame.websocket.PlayerSessionStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 @RequiredArgsConstructor
 public class GameHandler extends TextWebSocketHandler {
 
-    private final SessionGameBridge bridge;
+    private final PlayerSessionStorage bridge;
     private final GameService gameService;
     private final RequestProcessor processor;
 
