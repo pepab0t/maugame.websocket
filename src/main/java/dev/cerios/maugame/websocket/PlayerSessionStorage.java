@@ -1,5 +1,6 @@
 package dev.cerios.maugame.websocket;
 
+import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.mauengine.game.action.Action;
 import dev.cerios.maugame.websocket.event.ClearPlayerEvent;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiConsumer;
 
 @Component
 @Slf4j
@@ -22,6 +24,7 @@ public class PlayerSessionStorage {
 
     private final Map<String, CompletableFuture<WebSocketSession>> playerToSession = new ConcurrentHashMap<>();
     private final Map<String, Player> sessionToPlayer = new ConcurrentHashMap<>();
+    private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
     private final Map<String, PlayerConcurrentSources> playerLocks = new ConcurrentHashMap<>();
 
     public WebSocketSession getSession(Player player) {
@@ -46,7 +49,7 @@ public class PlayerSessionStorage {
         return playerLocks.computeIfAbsent(playerId, k -> PlayerConcurrentSources.create());
     }
 
-    public Player dropSession(String sessionId) {
+    private Player dropSession(String sessionId) {
         var player = sessionToPlayer.remove(sessionId);
         if (player == null) {
             throw new IllegalStateException("Unexpected error: session does not exist for session " + sessionId);
@@ -74,7 +77,23 @@ public class PlayerSessionStorage {
 
     @EventListener
     public void handleClearEvent(ClearPlayerEvent event) {
-        dropSession(event.getSessionId());
+        var player = event.getPlayer();
+        dropSession(player.getPlayerId());
+        playerToGame.remove(player.getPlayerId());
+    }
+
+    public void registerGame(String playerId, Game game) {
+        playerToGame.put(playerId, game);
+    }
+
+    public Optional<Game> getGame(String playerId) {
+        return Optional.ofNullable(playerToGame.get(playerId));
+    }
+
+    public void removePlayer(String sessionId, BiConsumer<Player, Game> gameAction) {
+        var player = dropSession(sessionId);
+        Optional.ofNullable(playerToGame.remove(player.getPlayerId()))
+                .ifPresent(game -> gameAction.accept(player, game));
     }
 
     public record PlayerConcurrentSources(Lock lock, BlockingQueue<Action> queue) {

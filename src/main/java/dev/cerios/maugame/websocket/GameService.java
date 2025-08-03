@@ -12,22 +12,21 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.web.socket.WebSocketSession;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class GameService {
-    private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
+    //    private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
     private final GameFactory gameFactory;
     private final MauSettings mauSettings;
     private final ActionDistributor actionDistributor;
+    private final PlayerSessionStorage storage;
 
     private Game currentGame;
 
-    public Player registerPlayer(String username) {
+    public void registerPlayer(String username, WebSocketSession session) {
         if (currentGame == null || currentGame.getFreeCapacity() == 0) {
             currentGame = gameFactory.createGame(2, mauSettings.getMaxPlayers());
         }
@@ -37,7 +36,6 @@ public class GameService {
         } catch (GameException e) {
             throw new RuntimeException(e);
         }
-        playerToGame.put(player.getPlayerId(), currentGame);
         if (currentGame.getFreeCapacity() == 0) {
             try {
                 currentGame.start();
@@ -45,47 +43,35 @@ public class GameService {
                 throw new RuntimeException(e);
             }
         }
-        return player;
+        storage.registerSession(player, session);
+        storage.registerGame(player.getPlayerId(), currentGame);
     }
 
-    public void disconnectPlayer(Player player) {
-        try {
-            var game = playerToGame.remove(player.getPlayerId());
-            switch (game.getStage()) {
-                case RUNNING -> game.deactivatePlayer(player.getPlayerId());
-                case LOBBY -> game.removePlayer(player.getPlayerId());
+    public void disconnectPlayer(String sessionId) {
+        storage.removePlayer(sessionId, (player, game) -> {
+            try {
+                switch (game.getStage()) {
+                    case RUNNING -> game.deactivatePlayer(player.getPlayerId());
+                    case LOBBY -> game.removePlayer(player.getPlayerId());
+                }
+            } catch (GameException e) {
+                throw new IllegalStateException(e);
             }
-        } catch (GameException e) {
-            throw new IllegalStateException(e);
-        } catch (NullPointerException ignore) {}
+        });
     }
 
     public void playCard(Player player, Card card, Color nextColor) throws MauEngineBaseException {
-        var game = playerToGame.get(player.getPlayerId());
-        if (game == null) {
-            throw new RuntimeException("No game"); // TODO think about handling no game
-        }
+        var game = storage.getGame(player.getPlayerId()).orElseThrow(() -> new RuntimeException("No game"));
         game.playCardMove(player.getPlayerId(), card, nextColor);
     }
 
     public void drawCard(Player player) throws MauEngineBaseException {
-        var game = playerToGame.get(player.getPlayerId());
-        if (game == null) {
-            throw new RuntimeException("No game"); // TODO think about handling no game
-        }
+        var game = storage.getGame(player.getPlayerId()).orElseThrow(() -> new RuntimeException("No game"));
         game.playDrawMove(player.getPlayerId());
     }
 
     public void pass(Player player) throws MauEngineBaseException {
-        var game = playerToGame.get(player.getPlayerId());
-        if (game == null) {
-            throw new RuntimeException("No game"); // TODO think about handling no game
-        }
+        var game = storage.getGame(player.getPlayerId()).orElseThrow(() -> new RuntimeException("No game"));
         game.playPassMove(player.getPlayerId());
-    }
-
-    @EventListener
-    public void handleClearEvent(ClearPlayerEvent event) {
-        playerToGame.remove(event.getPlayer().getPlayerId());
     }
 }

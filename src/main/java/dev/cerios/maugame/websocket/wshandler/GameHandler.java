@@ -24,17 +24,14 @@ public class GameHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
         var attributes = session.getAttributes();
         String username = attributes.get("user").toString();
-        var player = gameService.registerPlayer(username);
-        bridge.registerSession(player, session);
-
+        gameService.registerPlayer(username, session);
         log.info("{} joined the game on session {}", username, session.getId());
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         try {
-            var player = bridge.dropSession(session.getId());
-            gameService.disconnectPlayer(player);
+            gameService.disconnectPlayer(session.getId());
         } catch (Exception ignore) {
         }
     }
