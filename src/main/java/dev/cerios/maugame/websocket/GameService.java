@@ -47,6 +47,10 @@ public class GameService {
         storage.registerGame(player.getPlayerId(), currentGame);
     }
 
+    public void registerPlayer(String username, WebSocketSession session, String playerId) {
+        // logic
+    }
+
     public void disconnectPlayer(String sessionId) {
         storage.removePlayer(sessionId, (player, game) -> {
             try {
