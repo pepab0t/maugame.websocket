@@ -1,5 +1,7 @@
 package dev.cerios.maugame.websocket;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerios.maugame.mauengine.card.Card;
 import dev.cerios.maugame.mauengine.card.Color;
 import dev.cerios.maugame.mauengine.exception.GameException;
@@ -8,11 +10,17 @@ import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.websocket.event.ClearPlayerEvent;
+import dev.cerios.maugame.websocket.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+
+import java.io.IOException;
+
+import static dev.cerios.maugame.websocket.message.Message.createErrorMessage;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +31,7 @@ public class GameService {
     private final MauSettings mauSettings;
     private final ActionDistributor actionDistributor;
     private final PlayerSessionStorage storage;
+    private final ObjectMapper objectMapper;
 
     private Game currentGame;
 
@@ -47,21 +56,22 @@ public class GameService {
         storage.registerGame(player.getPlayerId(), currentGame);
     }
 
-    public void registerPlayer(String username, WebSocketSession session, String playerId) {
-        // logic
+    public void registerPlayer(String username, WebSocketSession session, String playerId) throws GameException, IOException {
+        try {
+            var game = storage.getGame(playerId).orElseThrow(() -> new NotFoundException("Game not found for given player."));
+            var player = game.getPlayer(playerId);
+            if (!player.getUsername().equals(username)) {
+                throw new NotFoundException(String.format("Player `%s` not found in game.", username));
+            }
+            game.activatePlayer(playerId);
+            storage.registerSession(player, session);
+        } catch (NotFoundException e) {
+            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(createErrorMessage(e))));
+        }
     }
 
     public void disconnectPlayer(String sessionId) {
-        storage.removePlayer(sessionId, (player, game) -> {
-            try {
-                switch (game.getStage()) {
-                    case RUNNING -> game.deactivatePlayer(player.getPlayerId());
-                    case LOBBY -> game.removePlayer(player.getPlayerId());
-                }
-            } catch (GameException e) {
-                throw new IllegalStateException(e);
-            }
-        });
+        storage.removePlayer(sessionId);
     }
 
     public void playCard(Player player, Card card, Color nextColor) throws MauEngineBaseException {

@@ -1,5 +1,6 @@
 package dev.cerios.maugame.websocket;
 
+import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.mauengine.game.action.Action;
@@ -25,6 +26,7 @@ public class PlayerSessionStorage {
     private final Map<String, CompletableFuture<WebSocketSession>> playerToSession = new ConcurrentHashMap<>();
     private final Map<String, Player> sessionToPlayer = new ConcurrentHashMap<>();
     private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
+
     private final Map<String, PlayerConcurrentSources> playerLocks = new ConcurrentHashMap<>();
 
     public WebSocketSession getSession(Player player) {
@@ -90,10 +92,22 @@ public class PlayerSessionStorage {
         return Optional.ofNullable(playerToGame.get(playerId));
     }
 
-    public void removePlayer(String sessionId, BiConsumer<Player, Game> gameAction) {
+    public void removePlayer(String sessionId) {
         var player = dropSession(sessionId);
-        Optional.ofNullable(playerToGame.remove(player.getPlayerId()))
-                .ifPresent(game -> gameAction.accept(player, game));
+        Optional.ofNullable(playerToGame.get(player.getPlayerId()))
+                .ifPresent(game -> {
+                    try {
+                        switch (game.getStage()) {
+                            case RUNNING -> game.deactivatePlayer(player.getPlayerId());
+                            case LOBBY, FINISH -> {
+                                game.removePlayer(player.getPlayerId());
+                                playerToGame.remove(player.getPlayerId());
+                            }
+                        }
+                    } catch (GameException e) {
+                        throw new IllegalStateException(e);
+                    }
+                });
     }
 
     public record PlayerConcurrentSources(Lock lock, BlockingQueue<Action> queue) {

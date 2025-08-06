@@ -40,6 +40,8 @@ public class ActionDistributor {
 
     public void distribute(Player player, Action action) {
         var ps = bridge.getPlayerSources(player.getPlayerId());
+        if (ps == null)
+            return;
         try {
             executor.execute(() -> distributeAction(ps, player));
             ps.queue().put(action);
