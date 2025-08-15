@@ -13,6 +13,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.io.IOException;
 import java.util.Optional;
 
 @Slf4j
@@ -24,7 +25,7 @@ public class GameHandler extends TextWebSocketHandler {
     private final RequestProcessor processor;
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws NotFoundException, GameException {
+    public void afterConnectionEstablished(WebSocketSession session) throws GameException, IOException {
         var attributes = session.getAttributes();
         String username = attributes.get("user").toString();
         var playerId = Optional.ofNullable(attributes.get("player")).map(Object::toString);

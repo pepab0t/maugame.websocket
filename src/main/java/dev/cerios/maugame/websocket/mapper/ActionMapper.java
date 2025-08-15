@@ -45,7 +45,7 @@ public abstract class ActionMapper {
     @Mapping(target = "players", expression = "java(action.players().stream().map(p -> p.getUsername()).toList())")
     public abstract ShowPlayersActionDto toDto(PlayersAction action);
 
-    @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
+    @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.getPlayer()))")
     public abstract PlayerActionDto toDto(PlayerShiftAction action);
 
     @Mapping(target = "playerDto", expression = "java(mapRegisterPlayer(action))")

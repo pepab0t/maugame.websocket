@@ -98,7 +98,6 @@ public class PlayerSessionStorage {
                 .ifPresent(game -> {
                     try {
                         switch (game.getStage()) {
-                            case RUNNING -> game.deactivatePlayer(player.getPlayerId());
                             case LOBBY, FINISH -> {
                                 game.removePlayer(player.getPlayerId());
                                 playerToGame.remove(player.getPlayerId());
@@ -108,6 +107,14 @@ public class PlayerSessionStorage {
                         throw new IllegalStateException(e);
                     }
                 });
+    }
+
+    public void removePlayer(Player player) {
+        Optional.ofNullable(playerToSession.remove(player.getPlayerId()))
+                .map(future -> future.getNow(null))
+                .ifPresent(session -> sessionToPlayer.remove(session.getId()));
+        playerLocks.remove(player.getPlayerId());
+        playerToGame.remove(player.getPlayerId());
     }
 
     public record PlayerConcurrentSources(Lock lock, BlockingQueue<Action> queue) {
