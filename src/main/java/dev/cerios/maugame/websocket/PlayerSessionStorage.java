@@ -54,7 +54,7 @@ public class PlayerSessionStorage {
     private Player dropSession(String sessionId) {
         var player = sessionToPlayer.remove(sessionId);
         if (player == null) {
-            throw new IllegalStateException("Unexpected error: session does not exist for session " + sessionId);
+            throw new IllegalStateException("Unexpected error: player does not exist for session " + sessionId);
         }
         Optional.ofNullable(playerToSession.remove(player.getPlayerId()))
                 .flatMap(future -> Optional.ofNullable(future.getNow(null)))
@@ -79,9 +79,7 @@ public class PlayerSessionStorage {
 
     @EventListener
     public void handleClearEvent(ClearPlayerEvent event) {
-        var player = event.getPlayer();
-        dropSession(player.getPlayerId());
-        playerToGame.remove(player.getPlayerId());
+        removePlayer(event.getPlayer());
     }
 
     public void registerGame(String playerId, Game game) {
@@ -112,7 +110,14 @@ public class PlayerSessionStorage {
     public void removePlayer(Player player) {
         Optional.ofNullable(playerToSession.remove(player.getPlayerId()))
                 .map(future -> future.getNow(null))
-                .ifPresent(session -> sessionToPlayer.remove(session.getId()));
+                .ifPresent(session -> {
+                    sessionToPlayer.remove(session.getId());
+                    try {
+                        session.close();
+                    } catch (IOException e) {
+                        log.debug("error during closing session", e);
+                    }
+                });
         playerLocks.remove(player.getPlayerId());
         playerToGame.remove(player.getPlayerId());
     }

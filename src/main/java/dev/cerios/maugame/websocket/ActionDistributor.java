@@ -22,7 +22,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static dev.cerios.maugame.mauengine.game.action.Action.ActionType.END_GAME;
 import static dev.cerios.maugame.websocket.PlayerSessionStorage.PlayerConcurrentSources;
 
 @Component
@@ -31,7 +30,7 @@ import static dev.cerios.maugame.websocket.PlayerSessionStorage.PlayerConcurrent
 public class ActionDistributor {
 
     private final ExecutorService executor;
-    private final PlayerSessionStorage bridge;
+    private final PlayerSessionStorage storage;
     private final ObjectMapper objectMapper;
     private final ActionMapper actionMapper;
     private final ApplicationEventPublisher publisher;
@@ -39,7 +38,7 @@ public class ActionDistributor {
     private final Lock lock = new ReentrantLock();
 
     public void distribute(Player player, Action action) {
-        var ps = bridge.getPlayerSources(player.getPlayerId());
+        var ps = storage.getPlayerSources(player.getPlayerId());
         if (ps == null)
             return;
         try {
@@ -54,7 +53,11 @@ public class ActionDistributor {
         try {
             ps.lock().lock();
             var a = ps.queue().take();
-            var session = bridge.getSession(player);
+
+            if (a.getType() == Action.ActionType.DISQUALIFIED)
+                storage.removePlayer(player);
+
+            var session = storage.getSession(player);
             var dto = mapAction(a);
 
             sendMessage(
@@ -62,8 +65,9 @@ public class ActionDistributor {
                     new TextMessage(objectMapper.writeValueAsString(Message.createActionMessage(dto)))
             );
 
-            if (a.getType() == END_GAME)
+            if (a.getType() == Action.ActionType.END_GAME)
                 publisher.publishEvent(new ClearPlayerEvent(this, session.getId(), player));
+
         } catch (JsonProcessingException e) {
             log.info("error during serialization", e);
         } catch (MauTimeoutException | InterruptedException ignore) {

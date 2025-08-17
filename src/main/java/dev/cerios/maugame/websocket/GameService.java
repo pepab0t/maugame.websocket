@@ -56,17 +56,16 @@ public class GameService {
         storage.registerGame(player.getPlayerId(), currentGame);
     }
 
-    public void registerPlayer(String username, WebSocketSession session, String playerId) throws GameException, IOException {
+    public void registerPlayer(String username, WebSocketSession session, String playerId) throws NotFoundException {
         try {
             var game = storage.getGame(playerId).orElseThrow(() -> new NotFoundException("Game not found for given player."));
             var player = game.getPlayer(playerId);
             if (!player.getUsername().equals(username)) {
                 throw new NotFoundException(String.format("Player `%s` not found in game.", username));
             }
-//            game.activatePlayer(playerId);
             storage.registerSession(player, session);
-        } catch (NotFoundException e) {
-            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(createErrorMessage(e))));
+        } catch (GameException e) {
+            throw new NotFoundException(e.getMessage());
         }
     }
 
