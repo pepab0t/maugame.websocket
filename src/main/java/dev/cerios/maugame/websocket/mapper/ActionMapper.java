@@ -46,13 +46,14 @@ public abstract class ActionMapper {
     public abstract ShowPlayersActionDto toDto(PlayersAction action);
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.getPlayer()))")
-    public abstract PlayerActionDto toDto(PlayerShiftAction action);
+    @Mapping(target = "expireAtMs", source = "action.expireAtMs")
+    public abstract PlayerShiftActionDto toDto(PlayerShiftAction action);
 
     @Mapping(target = "playerDto", expression = "java(mapRegisterPlayer(action))")
     public abstract PlayerActionDto toDto(RegisterAction action);
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
-    public abstract PlayerActionDto toDto(RemovePlayerAction action);
+    public abstract RemovePlayerActionDto toDto(RemovePlayerAction action);
 
     @Mapping(target = "players", expression = "java(action.playerRank().stream().toList())")
     public abstract ShowPlayersActionDto toDto(SendRankAction action);
