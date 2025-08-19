@@ -26,7 +26,7 @@ public abstract class ActionMapper {
     @Mapping(target = "cards", source = "action.cardsDrawn")
     public abstract DrawActionDto toDto(DrawAction action);
 
-    public abstract ActionDto toDto(EndAction action);
+    public abstract EndActionDto toDto(EndAction action);
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
     public abstract HiddenDrawDto toDto(HiddenDrawAction action);
