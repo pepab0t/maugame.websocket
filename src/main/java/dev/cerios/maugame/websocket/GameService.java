@@ -63,6 +63,7 @@ public class GameService {
                 throw new NotFoundException(String.format("Player `%s` not found in game.", username));
             }
             storage.registerSession(player, session);
+            game.sendCurrentStateTo(player);
         } catch (GameException e) {
             throw new NotFoundException(e.getMessage());
         }
