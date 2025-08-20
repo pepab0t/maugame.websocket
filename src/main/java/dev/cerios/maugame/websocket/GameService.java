@@ -27,12 +27,10 @@ import static dev.cerios.maugame.websocket.message.Message.createErrorMessage;
 @RequiredArgsConstructor
 @Slf4j
 public class GameService {
-    //    private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
     private final GameFactory gameFactory;
     private final MauSettings mauSettings;
     private final ActionDistributor actionDistributor;
     private final PlayerSessionStorage storage;
-    private final ObjectMapper objectMapper;
 
     private volatile Game currentGame;
 
