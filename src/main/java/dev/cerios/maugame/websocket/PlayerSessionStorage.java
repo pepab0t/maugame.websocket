@@ -24,39 +24,39 @@ import java.util.function.BiConsumer;
 public class PlayerSessionStorage {
 
     private final Map<String, CompletableFuture<WebSocketSession>> playerToSession = new ConcurrentHashMap<>();
-    private final Map<String, Player> sessionToPlayer = new ConcurrentHashMap<>();
+    private final Map<String, String> sessionToPlayer = new ConcurrentHashMap<>();
     private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
 
     private final Map<String, PlayerConcurrentSources> playerLocks = new ConcurrentHashMap<>();
 
-    public WebSocketSession getSession(Player player) {
+    public WebSocketSession getSession(String playerId) {
         long timeout = 300;
         try {
-            var sessionFuture = playerToSession.computeIfAbsent(player.getPlayerId(), k -> new CompletableFuture<>());
+            var sessionFuture = playerToSession.computeIfAbsent(playerId, k -> new CompletableFuture<>());
             return sessionFuture.get(timeout, TimeUnit.MILLISECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new MauTimeoutException("Not initialized in " + timeout + " milliseconds.", e);
         }
     }
 
-    public Player getPlayer(String sessionId) {
-        var player = sessionToPlayer.get(sessionId);
-        if (player == null) {
+    public String getPlayer(String sessionId) {
+        var playerId = sessionToPlayer.get(sessionId);
+        if (playerId == null) {
             throw new RuntimeException("Unexpected error: player should exist for session " + sessionId);
         }
-        return player;
+        return playerId;
     }
 
     public PlayerConcurrentSources getPlayerSources(String playerId) {
         return playerLocks.computeIfAbsent(playerId, k -> PlayerConcurrentSources.create());
     }
 
-    private Player dropSession(String sessionId) {
-        var player = sessionToPlayer.remove(sessionId);
-        if (player == null) {
+    private String dropSession(String sessionId) {
+        var playerId = sessionToPlayer.remove(sessionId);
+        if (playerId == null) {
             throw new IllegalStateException("Unexpected error: player does not exist for session " + sessionId);
         }
-        Optional.ofNullable(playerToSession.remove(player.getPlayerId()))
+        Optional.ofNullable(playerToSession.remove(playerId))
                 .flatMap(future -> Optional.ofNullable(future.getNow(null)))
                 .ifPresent(session -> {
                     try {
@@ -66,20 +66,20 @@ public class PlayerSessionStorage {
                         log.debug("error when closing session", e);
                     }
                 });
-        playerLocks.remove(player.getPlayerId());
-        return player;
+        playerLocks.remove(playerId);
+        return playerId;
     }
 
-    public void registerSession(Player player, WebSocketSession session) {
-        var sessionFuture = playerToSession.computeIfAbsent(player.getPlayerId(), k -> new CompletableFuture<>());
-        sessionToPlayer.put(session.getId(), player);
-        playerLocks.putIfAbsent(player.getPlayerId(), PlayerConcurrentSources.create());
+    public void registerSession(String playerId, WebSocketSession session) {
+        var sessionFuture = playerToSession.computeIfAbsent(playerId, k -> new CompletableFuture<>());
+        sessionToPlayer.put(session.getId(), playerId);
+        playerLocks.putIfAbsent(playerId, PlayerConcurrentSources.create());
         sessionFuture.complete(session);
     }
 
     @EventListener
     public void handleClearEvent(ClearPlayerEvent event) {
-        removePlayer(event.getPlayer());
+        removePlayer(event.getPlayerId());
     }
 
     public void registerGame(String playerId, Game game) {
@@ -91,14 +91,14 @@ public class PlayerSessionStorage {
     }
 
     public void removePlayer(String sessionId) {
-        var player = dropSession(sessionId);
-        Optional.ofNullable(playerToGame.get(player.getPlayerId()))
+        var playerId = dropSession(sessionId);
+        Optional.ofNullable(playerToGame.get(playerId))
                 .ifPresent(game -> {
                     try {
                         switch (game.getStage()) {
                             case LOBBY, FINISH -> {
-                                game.removePlayer(player.getPlayerId());
-                                playerToGame.remove(player.getPlayerId());
+                                game.removePlayer(playerId);
+                                playerToGame.remove(playerId);
                             }
                         }
                     } catch (GameException e) {

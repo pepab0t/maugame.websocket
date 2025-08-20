@@ -1,6 +1,5 @@
 package dev.cerios.maugame.websocket.event;
 
-import dev.cerios.maugame.mauengine.game.Player;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -12,11 +11,11 @@ import org.springframework.context.ApplicationEvent;
 public class ClearPlayerEvent extends ApplicationEvent {
 
     private final String sessionId;
-    private final Player player;
+    private final String playerId;
 
-    public ClearPlayerEvent(Object source, String sessionId, Player player) {
+    public ClearPlayerEvent(Object source, String sessionId, String playerId) {
         super(source);
         this.sessionId = sessionId;
-        this.player = player;
+        this.playerId = playerId;
     }
 }

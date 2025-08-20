@@ -32,10 +32,10 @@ public class RequestProcessor {
         try {
             JsonNode root = objectMapper.readTree(request);
             var requestType = RequestType.fromString(root.get("requestType").asText());
-            var player = bridge.getPlayer(session.getId());
+            var playerId = bridge.getPlayer(session.getId());
 
             switch (requestType) {
-                case MOVE -> processMove(/*TODO handle null*/root.get("move"), player);
+                case MOVE -> processMove(/*TODO handle null*/root.get("move"), playerId);
                 case CONTROL -> throw new InvalidCommandException("not supported");
             }
         } catch (JsonProcessingException | InvalidCommandException | RuntimeException | MauEngineBaseException e) {
@@ -47,15 +47,15 @@ public class RequestProcessor {
         }
     }
 
-    private void processMove(JsonNode node, Player player) throws InvalidCommandException, MauEngineBaseException {
+    private void processMove(JsonNode node, final String playerId) throws InvalidCommandException, MauEngineBaseException {
         var moveType = MoveType.fromString(node.get("moveType").asText());
         switch (moveType) {
             case PLAY -> {
                 var dto = objectMapper.convertValue(node, PlayRequestDto.class);
-                gameService.playCard(player, dto.card(), dto.nextColor());
+                gameService.playCard(playerId, dto.card(), dto.nextColor());
             }
-            case DRAW -> gameService.drawCard(player);
-            case PASS -> gameService.pass(player);
+            case DRAW -> gameService.drawCard(playerId);
+            case PASS -> gameService.pass(playerId);
         }
     }
 

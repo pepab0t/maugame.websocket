@@ -42,20 +42,20 @@ public class ActionDistributor {
         if (ps == null)
             return;
         try {
-            executor.execute(() -> distributeAction(ps, player));
+            executor.execute(() -> distributeAction(ps, player.getPlayerId()));
             ps.queue().put(action);
         } catch (RejectedExecutionException | InterruptedException e) {
             log.info("distribution {} to player {} rejected", action, player);
         }
     }
 
-    private void distributeAction(PlayerConcurrentSources ps, Player player) {
+    private void distributeAction(PlayerConcurrentSources ps, String playerId) {
         try {
             ps.lock().lock();
             var a = ps.queue().take();
 
 
-            var session = storage.getSession(player);
+            var session = storage.getSession(playerId);
             var dto = mapAction(a);
 
             sendMessage(
@@ -64,9 +64,9 @@ public class ActionDistributor {
             );
 
             if (a.getType() == Action.ActionType.END_GAME)
-                publisher.publishEvent(new ClearPlayerEvent(this, session.getId(), player));
+                publisher.publishEvent(new ClearPlayerEvent(this, session.getId(), playerId));
             if (a.getType() == Action.ActionType.DISQUALIFIED)
-                storage.removePlayer(player);
+                storage.removePlayer(playerId);
 
         } catch (JsonProcessingException e) {
             log.info("error during serialization", e);

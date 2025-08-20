@@ -51,7 +51,7 @@ public class GameService {
                 throw new RuntimeException(e);
             }
         }
-        storage.registerSession(player, session);
+        storage.registerSession(player.getPlayerId(), session);
         storage.registerGame(player.getPlayerId(), currentGame);
     }
 
@@ -62,7 +62,7 @@ public class GameService {
             if (!player.getUsername().equals(username)) {
                 throw new NotFoundException(String.format("Player `%s` not found in game.", username));
             }
-            storage.registerSession(player, session);
+            storage.registerSession(playerId, session);
             game.sendCurrentStateTo(player);
         } catch (GameException e) {
             throw new NotFoundException(e.getMessage());
@@ -73,18 +73,18 @@ public class GameService {
         storage.removePlayer(sessionId);
     }
 
-    public void playCard(Player player, Card card, Color nextColor) throws MauEngineBaseException {
-        var game = storage.getGame(player.getPlayerId()).orElseThrow(() -> new RuntimeException("No game"));
-        game.playCardMove(player.getPlayerId(), card, nextColor);
+    public void playCard(String playerId, Card card, Color nextColor) throws MauEngineBaseException {
+        var game = storage.getGame(playerId).orElseThrow(() -> new RuntimeException("No game"));
+        game.playCardMove(playerId, card, nextColor);
     }
 
-    public void drawCard(Player player) throws MauEngineBaseException {
-        var game = storage.getGame(player.getPlayerId()).orElseThrow(() -> new RuntimeException("No game"));
-        game.playDrawMove(player.getPlayerId());
+    public void drawCard(String playerId) throws MauEngineBaseException {
+        var game = storage.getGame(playerId).orElseThrow(() -> new RuntimeException("No game"));
+        game.playDrawMove(playerId);
     }
 
-    public void pass(Player player) throws MauEngineBaseException {
-        var game = storage.getGame(player.getPlayerId()).orElseThrow(() -> new RuntimeException("No game"));
-        game.playPassMove(player.getPlayerId());
+    public void pass(String playerId) throws MauEngineBaseException {
+        var game = storage.getGame(playerId).orElseThrow(() -> new RuntimeException("No game"));
+        game.playPassMove(playerId);
     }
 }
