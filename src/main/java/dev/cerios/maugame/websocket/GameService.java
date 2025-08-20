@@ -1,6 +1,5 @@
 package dev.cerios.maugame.websocket;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerios.maugame.mauengine.card.Card;
 import dev.cerios.maugame.mauengine.card.Color;
@@ -10,11 +9,9 @@ import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.mauengine.game.Stage;
-import dev.cerios.maugame.websocket.event.ClearPlayerEvent;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -31,6 +28,7 @@ public class GameService {
     private final MauSettings mauSettings;
     private final ActionDistributor actionDistributor;
     private final PlayerSessionStorage storage;
+    private final ObjectMapper objectMapper;
 
     private volatile Game currentGame;
 
@@ -42,7 +40,14 @@ public class GameService {
         try {
             player = currentGame.registerPlayer(username, actionDistributor::distribute);
         } catch (GameException e) {
-            throw new RuntimeException(e);
+            try {
+                // TODO object mapper at the same place for both register methods
+                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(createErrorMessage(e))));
+                session.close();
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+            return;
         }
         if (currentGame.getFreeCapacity() == 0) {
             try {
@@ -58,19 +63,16 @@ public class GameService {
     public void registerPlayer(String username, WebSocketSession session, String playerId) throws NotFoundException {
         try {
             var game = storage.getGame(playerId).orElseThrow(() -> new NotFoundException("Game not found for given player."));
-            var player = game.getPlayer(playerId);
-            if (!player.getUsername().equals(username)) {
-                throw new NotFoundException(String.format("Player `%s` not found in game.", username));
-            }
             storage.registerSession(playerId, session);
-            game.sendCurrentStateTo(player);
+            game.sendCurrentStateTo(playerId, p -> p.getUsername().equals(username));
         } catch (GameException e) {
+            storage.removePlayerById(playerId);
             throw new NotFoundException(e.getMessage());
         }
     }
 
     public void disconnectPlayer(String sessionId) {
-        storage.removePlayer(sessionId);
+        storage.removePlayerBySession(sessionId);
     }
 
     public void playCard(String playerId, Card card, Color nextColor) throws MauEngineBaseException {

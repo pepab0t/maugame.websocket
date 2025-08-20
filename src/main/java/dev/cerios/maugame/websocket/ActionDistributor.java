@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.mauengine.game.action.*;
 import dev.cerios.maugame.websocket.dto.action.ActionDto;
-import dev.cerios.maugame.websocket.event.ClearPlayerEvent;
 import dev.cerios.maugame.websocket.exception.MauTimeoutException;
 import dev.cerios.maugame.websocket.mapper.ActionMapper;
 import dev.cerios.maugame.websocket.message.Message;
@@ -64,9 +63,9 @@ public class ActionDistributor {
             );
 
             if (a.getType() == Action.ActionType.END_GAME)
-                publisher.publishEvent(new ClearPlayerEvent(this, session.getId(), playerId));
+                storage.removePlayerById(playerId);
             if (a.getType() == Action.ActionType.DISQUALIFIED)
-                storage.removePlayer(playerId);
+                storage.removePlayerById(playerId);
 
         } catch (JsonProcessingException e) {
             log.info("error during serialization", e);

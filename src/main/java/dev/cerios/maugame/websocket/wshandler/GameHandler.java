@@ -43,6 +43,7 @@ public class GameHandler extends TextWebSocketHandler {
                     } catch (NotFoundException e) {
                         try {
                             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(createErrorMessage(e))));
+                            session.close();
                         } catch (IOException ex) {
                             log.warn("cannot send websocket message", ex);
                         }
