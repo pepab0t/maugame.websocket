@@ -9,6 +9,7 @@ import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.mauengine.game.Player;
+import dev.cerios.maugame.mauengine.game.Stage;
 import dev.cerios.maugame.websocket.event.ClearPlayerEvent;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -33,10 +34,10 @@ public class GameService {
     private final PlayerSessionStorage storage;
     private final ObjectMapper objectMapper;
 
-    private Game currentGame;
+    private volatile Game currentGame;
 
     public void registerPlayer(String username, WebSocketSession session) {
-        if (currentGame == null || currentGame.getFreeCapacity() == 0) {
+        if (currentGame == null || currentGame.getStage() != Stage.LOBBY) {
             currentGame = gameFactory.createGame(2, mauSettings.getMaxPlayers());
         }
         Player player;
