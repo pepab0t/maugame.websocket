@@ -60,6 +60,8 @@ public abstract class ActionMapper {
 
     public abstract GameIdActionDto toDto(StartAction action);
 
+    public abstract ActionDto toDto(DisqualifiedAction action);
+
     public abstract CardActionDto toDto(StartPileAction action);
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")

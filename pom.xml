@@ -38,14 +38,15 @@
 		</dependency>
 
 		<dependency>
-			<groupId>dev.cerios.maugame</groupId>
-			<artifactId>game-engine</artifactId>
-			<version>1.0.1</version>
+			<groupId>dev.cerios</groupId>
+			<artifactId>maugame-engine</artifactId>
+            <version>${project.version}</version>
 		</dependency>
 
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
 			<optional>true</optional>
 		</dependency>
 		<dependency>

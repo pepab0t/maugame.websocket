@@ -54,8 +54,6 @@ public class ActionDistributor {
             ps.lock().lock();
             var a = ps.queue().take();
 
-            if (a.getType() == Action.ActionType.DISQUALIFIED)
-                storage.removePlayer(player);
 
             var session = storage.getSession(player);
             var dto = mapAction(a);
@@ -67,6 +65,8 @@ public class ActionDistributor {
 
             if (a.getType() == Action.ActionType.END_GAME)
                 publisher.publishEvent(new ClearPlayerEvent(this, session.getId(), player));
+            if (a.getType() == Action.ActionType.DISQUALIFIED)
+                storage.removePlayer(player);
 
         } catch (JsonProcessingException e) {
             log.info("error during serialization", e);
@@ -105,6 +105,7 @@ public class ActionDistributor {
             case StartAction a -> actionMapper.toDto(a);
             case StartPileAction a -> actionMapper.toDto(a);
             case WinAction a -> actionMapper.toDto(a);
+            case DisqualifiedAction a -> actionMapper.toDto(a);
             default -> throw new IllegalStateException("Unexpected value: " + action);
         };
     }
