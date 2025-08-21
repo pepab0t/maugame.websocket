@@ -14,11 +14,9 @@ import java.util.concurrent.Executors;
 @RequiredArgsConstructor
 public class AppConfig {
 
-    private final MauSettings mauSettings;
-
     @Bean
     public GameFactory gameFactory() {
-        return new GameFactory(new Random());
+        return new GameFactory(new Random(), virtualExecutor());
     }
 
     @Bean

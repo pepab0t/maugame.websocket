@@ -26,7 +26,7 @@ public abstract class ActionMapper {
     @Mapping(target = "cards", source = "action.cardsDrawn")
     public abstract DrawActionDto toDto(DrawAction action);
 
-    public abstract ActionDto toDto(EndAction action);
+    public abstract EndActionDto toDto(EndAction action);
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
     public abstract HiddenDrawDto toDto(HiddenDrawAction action);
@@ -45,19 +45,22 @@ public abstract class ActionMapper {
     @Mapping(target = "players", expression = "java(action.players().stream().map(p -> p.getUsername()).toList())")
     public abstract ShowPlayersActionDto toDto(PlayersAction action);
 
-    @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
-    public abstract PlayerActionDto toDto(PlayerShiftAction action);
+    @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.getPlayer()))")
+    @Mapping(target = "expireAtMs", source = "action.expireAtMs")
+    public abstract PlayerShiftActionDto toDto(PlayerShiftAction action);
 
     @Mapping(target = "playerDto", expression = "java(mapRegisterPlayer(action))")
     public abstract PlayerActionDto toDto(RegisterAction action);
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
-    public abstract PlayerActionDto toDto(RemovePlayerAction action);
+    public abstract RemovePlayerActionDto toDto(RemovePlayerAction action);
 
     @Mapping(target = "players", expression = "java(action.playerRank().stream().toList())")
     public abstract ShowPlayersActionDto toDto(SendRankAction action);
 
     public abstract GameIdActionDto toDto(StartAction action);
+
+    public abstract ActionDto toDto(DisqualifiedAction action);
 
     public abstract CardActionDto toDto(StartPileAction action);
 

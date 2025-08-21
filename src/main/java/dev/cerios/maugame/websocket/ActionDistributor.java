@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.mauengine.game.action.*;
 import dev.cerios.maugame.websocket.dto.action.ActionDto;
-import dev.cerios.maugame.websocket.event.ClearPlayerEvent;
 import dev.cerios.maugame.websocket.exception.MauTimeoutException;
 import dev.cerios.maugame.websocket.mapper.ActionMapper;
 import dev.cerios.maugame.websocket.message.Message;
@@ -22,8 +21,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static dev.cerios.maugame.mauengine.game.action.Action.ActionType.END_GAME;
-import static dev.cerios.maugame.websocket.SessionGameBridge.PlayerConcurrentSources;
+import static dev.cerios.maugame.websocket.PlayerSessionStorage.PlayerConcurrentSources;
 
 @Component
 @RequiredArgsConstructor
@@ -31,7 +29,7 @@ import static dev.cerios.maugame.websocket.SessionGameBridge.PlayerConcurrentSou
 public class ActionDistributor {
 
     private final ExecutorService executor;
-    private final SessionGameBridge bridge;
+    private final PlayerSessionStorage storage;
     private final ObjectMapper objectMapper;
     private final ActionMapper actionMapper;
     private final ApplicationEventPublisher publisher;
@@ -39,20 +37,24 @@ public class ActionDistributor {
     private final Lock lock = new ReentrantLock();
 
     public void distribute(Player player, Action action) {
-        var ps = bridge.getPlayerSources(player.getPlayerId());
+        var ps = storage.getPlayerSources(player.getPlayerId());
+        if (ps == null)
+            return;
         try {
-            executor.execute(() -> distributeAction(ps, player));
+            executor.execute(() -> distributeAction(ps, player.getPlayerId()));
             ps.queue().put(action);
         } catch (RejectedExecutionException | InterruptedException e) {
             log.info("distribution {} to player {} rejected", action, player);
         }
     }
 
-    private void distributeAction(PlayerConcurrentSources ps, Player player) {
+    private void distributeAction(PlayerConcurrentSources ps, String playerId) {
         try {
             ps.lock().lock();
             var a = ps.queue().take();
-            var session = bridge.getSession(player);
+
+
+            var session = storage.getSession(playerId);
             var dto = mapAction(a);
 
             sendMessage(
@@ -60,8 +62,11 @@ public class ActionDistributor {
                     new TextMessage(objectMapper.writeValueAsString(Message.createActionMessage(dto)))
             );
 
-            if (a.getType() == END_GAME)
-                publisher.publishEvent(new ClearPlayerEvent(this, session.getId(), player));
+            if (a.getType() == Action.ActionType.END_GAME)
+                storage.removePlayerById(playerId);
+            if (a.getType() == Action.ActionType.DISQUALIFIED)
+                storage.removePlayerById(playerId);
+
         } catch (JsonProcessingException e) {
             log.info("error during serialization", e);
         } catch (MauTimeoutException | InterruptedException ignore) {
@@ -99,6 +104,7 @@ public class ActionDistributor {
             case StartAction a -> actionMapper.toDto(a);
             case StartPileAction a -> actionMapper.toDto(a);
             case WinAction a -> actionMapper.toDto(a);
+            case DisqualifiedAction a -> actionMapper.toDto(a);
             default -> throw new IllegalStateException("Unexpected value: " + action);
         };
     }
