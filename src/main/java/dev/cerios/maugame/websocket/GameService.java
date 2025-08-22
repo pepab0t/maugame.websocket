@@ -36,9 +36,9 @@ public class GameService {
         if (currentGame == null || currentGame.getStage() != Stage.LOBBY) {
             currentGame = gameFactory.createGame(2, mauSettings.getMaxPlayers());
         }
-        Player player;
+        String playerId;
         try {
-            player = currentGame.registerPlayer(username, actionDistributor::distribute);
+            playerId = currentGame.registerPlayer(username, actionDistributor::distribute);
         } catch (GameException e) {
             try {
                 // TODO object mapper at the same place for both register methods
@@ -56,8 +56,8 @@ public class GameService {
                 throw new RuntimeException(e);
             }
         }
-        storage.registerSession(player.getPlayerId(), session);
-        storage.registerGame(player.getPlayerId(), currentGame);
+        storage.registerSession(playerId, session);
+        storage.registerGame(playerId, currentGame);
     }
 
     public void registerPlayer(String username, WebSocketSession session, String playerId) throws NotFoundException {
