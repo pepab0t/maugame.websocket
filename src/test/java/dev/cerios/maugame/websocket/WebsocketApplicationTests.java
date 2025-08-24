@@ -29,7 +29,7 @@ class WebsocketApplicationTests {
                 {
                     "requestType": "MOVE",
                     "move": {
-                        "moveType": "PLA"
+                        "moveType": "PLAY"
                     }
                 }
                 """;

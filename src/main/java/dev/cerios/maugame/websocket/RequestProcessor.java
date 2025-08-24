@@ -8,6 +8,7 @@ import dev.cerios.maugame.websocket.dto.request.PlayRequestDto;
 import dev.cerios.maugame.websocket.exception.InvalidCommandException;
 import dev.cerios.maugame.websocket.mapper.ExceptionMapper;
 import dev.cerios.maugame.websocket.request.RequestType;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,6 +28,7 @@ public class RequestProcessor {
     private final PlayerSessionStorage storage;
     private final GameService gameService;
     private final LobbyHandler lobbyHandler;
+    private final Validator validator;
 
     public void process(WebSocketSession session, String request) {
         try {
@@ -58,7 +60,12 @@ public class RequestProcessor {
         switch (moveType) {
             case PLAY -> {
                 var dto = objectMapper.convertValue(node, PlayRequestDto.class);
-                gameService.playCard(playerId, dto.getCard(), dto.getNextColor());
+                // TODO validate dto
+                var constraints = validator.validate(dto);
+                if (!constraints.isEmpty()) {
+                    throw new InvalidCommandException("invalid: " + dto.toString());
+                }
+                gameService.playCard(playerId, dto.card(), dto.nextColor());
             }
             case DRAW -> gameService.drawCard(playerId);
             case PASS -> gameService.pass(playerId);
