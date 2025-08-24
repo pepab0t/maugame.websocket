@@ -5,7 +5,7 @@ import lombok.Getter;
 import java.time.Instant;
 
 @Getter
-public class ServerMessage {
+public class ServerMessage implements Message {
     private final MessageType messageType = MessageType.SERVER_MESSAGE;
     private final ServerMessageBody body;
 

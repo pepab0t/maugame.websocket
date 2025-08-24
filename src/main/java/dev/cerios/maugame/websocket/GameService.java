@@ -39,6 +39,7 @@ public class GameService {
     }
 
     public void disconnectPlayer(String sessionId) {
+        lobbyHandler.removePlayer(sessionId);
         storage.removePlayerBySession(sessionId);
     }
 

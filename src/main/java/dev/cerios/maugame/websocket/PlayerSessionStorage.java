@@ -36,6 +36,11 @@ public class PlayerSessionStorage {
         }
     }
 
+    public Optional<WebSocketSession> getSessionInstant(String playerId) {
+        return Optional.ofNullable(playerToSession.get(playerId))
+                .map(cf -> cf.getNow(null));
+    }
+
     public String getPlayer(String sessionId) {
         var playerId = sessionToPlayer.get(sessionId);
         if (playerId == null) {

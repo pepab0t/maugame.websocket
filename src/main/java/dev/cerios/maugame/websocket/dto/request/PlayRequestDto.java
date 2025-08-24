@@ -4,16 +4,26 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.cerios.maugame.mauengine.card.Card;
 import dev.cerios.maugame.mauengine.card.Color;
 import dev.cerios.maugame.websocket.request.MoveRequest;
-import dev.cerios.maugame.websocket.request.MoveRequestBody;
-import dev.cerios.maugame.websocket.request.MoveType;
-import dev.cerios.maugame.websocket.request.Request;
+import dev.cerios.maugame.websocket.request.RequestType;
+import lombok.*;
 
-public record PlayRequestDto(
-        Card card,
-        @JsonProperty(defaultValue = "null") Color nextColor
-) implements MoveRequestBody {
+@Getter
+@Setter
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+public class PlayRequestDto extends MoveRequest {
 
-    public MoveType getMoveType() {
-        return MoveType.PLAY;
+    private final Card card;
+    private final Color nextColor;
+
+    public PlayRequestDto(
+            RequestType.MoveType moveType,
+            Card card,
+            @JsonProperty(defaultValue = "null") Color nextColor
+    ) {
+        super(moveType);
+        this.card = card;
+        this.nextColor = nextColor;
     }
+
 }
