@@ -10,10 +10,11 @@ public class TestClient extends StandardWebSocketClient {
 
     private final String uriTemplate;
 
-    private final TestWebSocketHandler handler = new TestWebSocketHandler();
+    private final TestWebSocketHandler handler;
 
-    public TestClient(String uriTemplate) {
+    public TestClient(String uriTemplate, long timeoutMs) {
         this.uriTemplate = uriTemplate;
+        this.handler = new TestWebSocketHandler(timeoutMs);
     }
 
 

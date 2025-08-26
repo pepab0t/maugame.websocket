@@ -1,6 +1,7 @@
 package dev.cerios.maugame.websocket.clientutils;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNullApi;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -11,11 +12,14 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+@RequiredArgsConstructor
 public class TestWebSocketHandler extends TextWebSocketHandler {
     @Getter
     private final List<String> receivedMessages = new LinkedList<>();
 
     private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+
+    private final long timeoutMs;
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
@@ -28,7 +32,7 @@ public class TestWebSocketHandler extends TextWebSocketHandler {
 
         Thread.startVirtualThread(() -> {
             try {
-                Thread.sleep(5_000);
+                Thread.sleep(timeoutMs);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
