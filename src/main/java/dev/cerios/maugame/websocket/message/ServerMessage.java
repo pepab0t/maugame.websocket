@@ -21,8 +21,8 @@ public class ServerMessage implements Message {
         return new ServerMessage(new UnreadyMessageBody(username));
     }
 
-    public static ServerMessage ofInfo(String username) {
-        return new ServerMessage(new InfoMessageBody(username));
+    public static ServerMessage ofInfo(String message) {
+        return new ServerMessage(new InfoMessageBody(message));
     }
 
     @Getter

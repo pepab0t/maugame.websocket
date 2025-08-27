@@ -5,12 +5,18 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 
 public class TestClient extends StandardWebSocketClient {
 
     private final String uriTemplate;
 
     private final TestWebSocketHandler handler;
+
+    public TestClient(String uriTemplate, Predicate<String> messagePredicate, long timeoutMs) {
+        this.uriTemplate = uriTemplate;
+        this.handler = new TestWebSocketHandler(messagePredicate, timeoutMs);
+    }
 
     public TestClient(String uriTemplate, long timeoutMs) {
         this.uriTemplate = uriTemplate;

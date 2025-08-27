@@ -11,20 +11,31 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.function.Predicate;
 
-@RequiredArgsConstructor
 public class TestWebSocketHandler extends TextWebSocketHandler {
     @Getter
     private final List<String> receivedMessages = new LinkedList<>();
-
     private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
-
+    private final Predicate<String> messagePredicate;
     private final long timeoutMs;
 
+    public TestWebSocketHandler(Predicate<String> messagePredicate, long timeoutMs) {
+        this.messagePredicate = messagePredicate;
+        this.timeoutMs = timeoutMs;
+    }
+
+    public TestWebSocketHandler(long timeoutMs) {
+        this(message -> true, timeoutMs);
+    }
+
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        receivedMessages.add(message.getPayload());
-        queue.add(message.getPayload());
+    protected synchronized void handleTextMessage(WebSocketSession session, TextMessage message) {
+        String payload;
+        if (messagePredicate.test(payload = message.getPayload())) {
+            receivedMessages.add(payload);
+            queue.add(payload);
+        }
     }
 
     public String get() throws InterruptedException {

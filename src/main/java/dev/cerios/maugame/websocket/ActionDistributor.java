@@ -32,7 +32,6 @@ public class ActionDistributor {
     private final PlayerSessionStorage storage;
     private final ObjectMapper objectMapper;
     private final ActionMapper actionMapper;
-    private final ApplicationEventPublisher publisher;
 
     private final Lock lock = new ReentrantLock();
 
