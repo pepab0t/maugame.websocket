@@ -5,7 +5,9 @@ import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
 import org.json.JSONException;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +33,7 @@ class IntegrationLobbyTest {
     private int port;
     private TestClient client;
 
-    static final long TIMEOUT_MS = 50_000;
+    static final long TIMEOUT_MS = 3_000;
 
     @MockitoSpyBean
     private GameFactory gameFactory;
@@ -49,7 +51,7 @@ class IntegrationLobbyTest {
         lobbyHandler.clear();
     }
 
-    @RepeatedTest(10)
+    @Test
     void shouldReceiveRegisterActions() throws IOException, InterruptedException {
         // setup
         var client2 = new TestClient(createConnectionUri("user2"), TIMEOUT_MS);

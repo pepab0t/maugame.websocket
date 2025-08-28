@@ -139,7 +139,7 @@ public class LobbyHandler {
                 });
     }
 
-    public void clear() {
+    public synchronized void clear() {
         this.games.clear();
         this.players.clear();
         this.gameQueue.clear();

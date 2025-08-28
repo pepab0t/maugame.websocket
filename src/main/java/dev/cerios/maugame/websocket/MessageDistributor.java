@@ -8,17 +8,13 @@ import dev.cerios.maugame.websocket.dto.action.ActionDto;
 import dev.cerios.maugame.websocket.exception.MauTimeoutException;
 import dev.cerios.maugame.websocket.mapper.ActionMapper;
 import dev.cerios.maugame.websocket.message.Message;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
-import java.util.Queue;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -48,40 +44,49 @@ public class MessageDistributor {
             var ps = storage.getPlayerSources(player.getPlayerId());
             if (ps == null)
                 return;
-            ps.queue().add(() -> distributeAction(ps, player.getPlayerId(), action));
-            executor.execute(() -> ps.queue().remove().run());
+            ps.queue().add(() -> distributeAction(player.getPlayerId(), action));
+            System.out.printf("action %s added to player's %s queue%n", action, player.getPlayerId());
+            executor.execute(() -> {
+                try {
+                    ps.lock().lock();
+                    ps.queue().remove().run();
+                } finally {
+                    ps.lock().unlock();
+                }
+            });
         } finally {
             lock.unlock();
         }
     }
 
     public void enqueueMessage(String playerId, Message message) {
-        try {
-            lock.lock();
-            final var ps = storage.getPlayerSources(playerId);
-            if (ps == null)
-                return;
-            ps.queue().add(() -> {
-                try {
-                    ps.lock().lock();
-                    var session = storage.getSession(playerId);
-                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(message)));
-                } catch (IOException e) {
-                    log.info("error during serialization", e);
-                } finally {
-                    ps.lock().unlock();
-                }
-            });
-            executor.execute(() -> ps.queue().remove().run());
-        } finally {
-            lock.unlock();
-        }
+        final var ps = storage.getPlayerSources(playerId);
+        if (ps == null)
+            return;
+        ps.queue().add(() -> storage.getSessionInstant(playerId)
+                .ifPresentOrElse(
+                        session -> {
+                            try {
+                                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(message)));
+                            } catch (IOException e) {
+                                log.info("Message {} could not be serialized.", message, e);
+                            }
+                        },
+                        () -> log.debug("Message {} will not be sent, since session for player {} not found.", message, playerId)
+                )
+        );
+        executor.execute(() -> {
+            try {
+                ps.lock().lock();
+                ps.queue().remove().run();
+            } finally {
+                ps.lock().unlock();
+            }
+        });
     }
 
-    private void distributeAction(PlayerConcurrentSources ps, String playerId, Action a) {
+    private void distributeAction(String playerId, Action a) {
         try {
-            ps.lock().lock();
-
             var session = storage.getSession(playerId);
             var dto = mapAction(a);
 
@@ -98,8 +103,6 @@ public class MessageDistributor {
         } catch (JsonProcessingException e) {
             log.info("error during serialization", e);
         } catch (MauTimeoutException ignore) {
-        } finally {
-            ps.lock().unlock();
         }
     }
 
