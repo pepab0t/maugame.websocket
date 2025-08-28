@@ -45,7 +45,6 @@ public class MessageDistributor {
             if (ps == null)
                 return;
             ps.queue().add(() -> distributeAction(player.getPlayerId(), action));
-            System.out.printf("action %s added to player's %s queue%n", action, player.getPlayerId());
             executor.execute(() -> {
                 try {
                     ps.lock().lock();
@@ -60,29 +59,34 @@ public class MessageDistributor {
     }
 
     public void enqueueMessage(String playerId, Message message) {
-        final var ps = storage.getPlayerSources(playerId);
-        if (ps == null)
-            return;
-        ps.queue().add(() -> storage.getSessionInstant(playerId)
-                .ifPresentOrElse(
-                        session -> {
-                            try {
-                                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(message)));
-                            } catch (IOException e) {
-                                log.info("Message {} could not be serialized.", message, e);
-                            }
-                        },
-                        () -> log.debug("Message {} will not be sent, since session for player {} not found.", message, playerId)
-                )
-        );
-        executor.execute(() -> {
-            try {
-                ps.lock().lock();
-                ps.queue().remove().run();
-            } finally {
-                ps.lock().unlock();
-            }
-        });
+        try {
+            lock.lock();
+            final var ps = storage.getPlayerSources(playerId);
+            if (ps == null)
+                return;
+            ps.queue().add(() -> storage.getSessionInstant(playerId)
+                    .ifPresentOrElse(
+                            session -> {
+                                try {
+                                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(message)));
+                                } catch (IOException e) {
+                                    log.info("Message {} could not be serialized.", message, e);
+                                }
+                            },
+                            () -> log.debug("Message {} will not be sent, since session for player {} not found.", message, playerId)
+                    )
+            );
+            executor.execute(() -> {
+                try {
+                    ps.lock().lock();
+                    ps.queue().remove().run();
+                } finally {
+                    ps.lock().unlock();
+                }
+            });
+        } finally {
+            lock.unlock();
+        }
     }
 
     private void distributeAction(String playerId, Action a) {

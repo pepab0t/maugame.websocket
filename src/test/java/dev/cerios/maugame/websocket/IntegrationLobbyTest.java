@@ -5,9 +5,8 @@ import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
 import org.json.JSONException;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestMethodOrder(MethodOrderer.Random.class)
 class IntegrationLobbyTest {
 
     @LocalServerPort
@@ -145,13 +145,9 @@ class IntegrationLobbyTest {
             s3.sendMessage(readyRequest);
             client3.get();
 
-            //            client3.get(3); // wait for all 3 READY messages
-
             // then
             verify(gameMock, timeout(TIMEOUT_MS)).start();
         }
-
-        client3.getReceivedMessages().forEach(out::println);
     }
 
     private void assertRegisterAction(String jsonMessage, String expectedUsername) {
