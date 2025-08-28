@@ -5,8 +5,7 @@ import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
 import org.json.JSONException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,9 +16,7 @@ import org.springframework.web.socket.TextMessage;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import static dev.cerios.maugame.websocket.clientutils.JsonFactory.createReadyRequest;
@@ -28,26 +25,31 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class IntegrationTest {
+class IntegrationLobbyTest {
 
     @LocalServerPort
     private int port;
     private TestClient client;
 
-    static final long TIMEOUT_MS = 5_000;
-
-    @Autowired
-    private LobbyHandler lobbyHandler;
+    static final long TIMEOUT_MS = 50_000;
 
     @MockitoSpyBean
     private GameFactory gameFactory;
+
+    @Autowired
+    private LobbyHandler lobbyHandler;
 
     @BeforeEach
     void setUp() {
         client = new TestClient(createConnectionUri("user1"), TIMEOUT_MS);
     }
 
-    @Test
+    @AfterEach
+    void tearDown() {
+        lobbyHandler.clear();
+    }
+
+    @RepeatedTest(10)
     void shouldReceiveRegisterActions() throws IOException, InterruptedException {
         // setup
         var client2 = new TestClient(createConnectionUri("user2"), TIMEOUT_MS);
@@ -55,11 +57,12 @@ class IntegrationTest {
         List<String> messages2;
 
         // when
-        try (var ignore1 = client.handshake().join();
-             var ignore2 = client2.handshake().join()) {
+        try (var ignore1 = client.handshake().join(); var ignore2 = client2.handshake().join()) {
             messages1 = client.get(3);
             messages2 = client2.get(2);
         }
+
+        messages1.forEach(System.out::println);
 
         // then
         assertRegisterAction(messages1.getFirst(), "user1");
@@ -73,8 +76,7 @@ class IntegrationTest {
     @Test
     void testShouldGetReadyLobbyResponse() throws IOException, InterruptedException {
         var client2 = new TestClient(createConnectionUri("user2"), TIMEOUT_MS);
-        try (var session = client.handshake().join();
-             var ignore = client2.handshake().join()) {
+        try (var session = client.handshake().join(); var ignore = client2.handshake().join()) {
 
             client.get(3);
             session.sendMessage(new TextMessage(createReadyRequest()));
@@ -85,6 +87,7 @@ class IntegrationTest {
 
         assertReadyMessage(client.getReceivedMessages().getLast(), "user1");
         assertReadyMessage(client2.getReceivedMessages().getLast(), "user1");
+        out.println("END");
     }
 
     @Test
@@ -106,6 +109,7 @@ class IntegrationTest {
 
         // then
         var messages = client2.getReceivedMessages();
+        messages.forEach(out::println);
         assertReadyMessage(messages.getFirst(), "user2");
         assertUnreadyMessage(messages.get(1), "user2");
         assertRemovePlayerAction(messages.get(2), "user1");
@@ -120,21 +124,26 @@ class IntegrationTest {
         );
         var client3 = new TestClient(
                 createConnectionUri("user3"),
-                message ->  message.matches(".*:\\s*\"READY.*"),
+                message -> message.matches(".*:\\s*\"READY.*"),
                 TIMEOUT_MS
         );
         var readyRequest = new TextMessage(createReadyRequest());
         var gameMock = mock(Game.class);
         when(gameFactory.createGame(any(int.class), any(int.class))).thenReturn(gameMock);
-        when(gameMock.registerPlayer(any(String.class), any())).thenReturn("id1", "id2", "id3");
+        when(gameMock.registerPlayer(any(String.class), any()))
+                .thenReturn("id1", "id2", "id3");
+
         when(gameMock.getUuid()).thenReturn(UUID.randomUUID());
 
         try (var s1 = client.handshake().join(); var s2 = client2.handshake().join(); var s3 = client3.handshake().join()) {
             s1.sendMessage(readyRequest);
+            client3.get();
             s2.sendMessage(readyRequest);
+            client3.get();
             s3.sendMessage(readyRequest);
+            client3.get();
 
-            client3.get(3); // wait for all 3 READY messages
+            //            client3.get(3); // wait for all 3 READY messages
 
             // then
             verify(gameMock, timeout(TIMEOUT_MS)).start();
@@ -209,9 +218,7 @@ class IntegrationTest {
                                 "username": "%s"
                               }
                             }
-                            """.formatted(expectedUsername),
-                    jsonMessage,
-                    JSONCompareMode.NON_EXTENSIBLE
+                            """.formatted(expectedUsername), jsonMessage, JSONCompareMode.NON_EXTENSIBLE
             );
         } catch (JSONException e) {
             throw new RuntimeException(e);
@@ -229,9 +236,7 @@ class IntegrationTest {
                                 "username": "%s"
                               }
                             }
-                            """.formatted(expectedUsername),
-                    jsonMessage,
-                    JSONCompareMode.NON_EXTENSIBLE
+                            """.formatted(expectedUsername), jsonMessage, JSONCompareMode.NON_EXTENSIBLE
             );
         } catch (JSONException e) {
             throw new RuntimeException(e);

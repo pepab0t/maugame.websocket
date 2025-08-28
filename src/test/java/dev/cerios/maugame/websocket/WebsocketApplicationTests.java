@@ -37,6 +37,6 @@ class WebsocketApplicationTests {
         when(storage.getPlayer(any())).thenReturn("123");
         when(session.getId()).thenReturn("session1");
 
-        requestProcessor.process(session, json);
+        requestProcessor.process(session.getId(), json);
     }
 }

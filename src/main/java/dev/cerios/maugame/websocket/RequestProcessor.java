@@ -12,10 +12,7 @@ import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
 
-import java.io.IOException;
 import java.util.Optional;
 
 @Component
@@ -29,12 +26,13 @@ public class RequestProcessor {
     private final GameService gameService;
     private final LobbyHandler lobbyHandler;
     private final Validator validator;
+    private final MessageDistributor distributor;
 
-    public void process(WebSocketSession session, String request) {
+    public void process(String sessionId, String request) {
+        var playerId = storage.getPlayer(sessionId);
         try {
             JsonNode root = objectMapper.readTree(request);
-            var requestType = objectMapper.convertValue(root.get("requestType"),  RequestType.class);
-            var playerId = storage.getPlayer(session.getId());
+            var requestType = objectMapper.convertValue(root.get("requestType"), RequestType.class);
 
             switch (requestType) {
                 case MOVE -> processMove(
@@ -47,11 +45,7 @@ public class RequestProcessor {
                 );
             }
         } catch (JsonProcessingException | InvalidCommandException | RuntimeException | MauEngineBaseException e) {
-            try {
-                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(exceptionMapper.toErrorResponse(e))));
-            } catch (IOException ex) {
-                log.error("error sending websocket message", ex);
-            }
+            distributor.enqueueMessage(playerId, exceptionMapper.toErrorResponse(e));
         }
     }
 

@@ -25,6 +25,7 @@ public class GameService {
             throw new RuntimeException(e);
         }
         storage.registerSession(playerId, session);
+        log.info("player {}({}) registered with session {}", username, playerId, session.getId());
     }
 
     public void registerPlayer(String username, WebSocketSession session, String playerId) throws NotFoundException {

@@ -1,9 +1,11 @@
 package dev.cerios.maugame.websocket.message;
 
 import lombok.Getter;
+import lombok.ToString;
 
 import java.time.Instant;
 
+@ToString
 @Getter
 public class ServerMessage implements Message {
     private final MessageType messageType = MessageType.SERVER_MESSAGE;
@@ -26,6 +28,7 @@ public class ServerMessage implements Message {
     }
 
     @Getter
+    @ToString
     public abstract static class MessageBody {
 
         private final BodyType bodyType;
@@ -42,6 +45,7 @@ public class ServerMessage implements Message {
     }
 
     @Getter
+    @ToString(callSuper = true)
     public static class InfoMessageBody extends MessageBody {
         private final String message;
         private final Instant timestamp = Instant.now();
@@ -53,6 +57,7 @@ public class ServerMessage implements Message {
     }
 
     @Getter
+    @ToString(callSuper = true)
     public static class ReadyMessageBody extends MessageBody {
         private final String username;
 
@@ -64,6 +69,7 @@ public class ServerMessage implements Message {
     }
 
     @Getter
+    @ToString(callSuper = true)
     public static class UnreadyMessageBody extends MessageBody {
         private final String username;
 

@@ -8,25 +8,25 @@ import dev.cerios.maugame.websocket.dto.action.ActionDto;
 import dev.cerios.maugame.websocket.exception.MauTimeoutException;
 import dev.cerios.maugame.websocket.mapper.ActionMapper;
 import dev.cerios.maugame.websocket.message.Message;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.Queue;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static dev.cerios.maugame.websocket.PlayerSessionStorage.PlayerConcurrentSources;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
-public class ActionDistributor {
+public class MessageDistributor {
 
     private final ExecutorService executor;
     private final PlayerSessionStorage storage;
@@ -35,23 +35,52 @@ public class ActionDistributor {
 
     private final Lock lock = new ReentrantLock();
 
+    public MessageDistributor(ExecutorService executor, PlayerSessionStorage storage, ObjectMapper objectMapper, ActionMapper actionMapper) {
+        this.executor = executor;
+        this.storage = storage;
+        this.objectMapper = objectMapper;
+        this.actionMapper = actionMapper;
+    }
+
     public void distribute(Player player, Action action) {
-        var ps = storage.getPlayerSources(player.getPlayerId());
-        if (ps == null)
-            return;
         try {
-            executor.execute(() -> distributeAction(ps, player.getPlayerId()));
-            ps.queue().put(action);
-        } catch (RejectedExecutionException | InterruptedException e) {
-            log.info("distribution {} to player {} rejected", action, player);
+            lock.lock();
+            var ps = storage.getPlayerSources(player.getPlayerId());
+            if (ps == null)
+                return;
+            ps.queue().add(() -> distributeAction(ps, player.getPlayerId(), action));
+            executor.execute(() -> ps.queue().remove().run());
+        } finally {
+            lock.unlock();
         }
     }
 
-    private void distributeAction(PlayerConcurrentSources ps, String playerId) {
+    public void enqueueMessage(String playerId, Message message) {
+        try {
+            lock.lock();
+            final var ps = storage.getPlayerSources(playerId);
+            if (ps == null)
+                return;
+            ps.queue().add(() -> {
+                try {
+                    ps.lock().lock();
+                    var session = storage.getSession(playerId);
+                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(message)));
+                } catch (IOException e) {
+                    log.info("error during serialization", e);
+                } finally {
+                    ps.lock().unlock();
+                }
+            });
+            executor.execute(() -> ps.queue().remove().run());
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void distributeAction(PlayerConcurrentSources ps, String playerId, Action a) {
         try {
             ps.lock().lock();
-            var a = ps.queue().take();
-
 
             var session = storage.getSession(playerId);
             var dto = mapAction(a);
@@ -68,7 +97,7 @@ public class ActionDistributor {
 
         } catch (JsonProcessingException e) {
             log.info("error during serialization", e);
-        } catch (MauTimeoutException | InterruptedException ignore) {
+        } catch (MauTimeoutException ignore) {
         } finally {
             ps.lock().unlock();
         }
@@ -79,7 +108,7 @@ public class ActionDistributor {
             lock.lock();
             session.sendMessage(message);
         } catch (IOException | IllegalStateException exception) {
-            log.debug("error sending message {}", exception.getMessage());
+            log.trace("error sending message {}", message.getPayload(), exception);
         } finally {
             lock.unlock();
         }

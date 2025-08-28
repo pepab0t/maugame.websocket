@@ -11,9 +11,11 @@ import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -32,6 +34,8 @@ public class PlayerSessionStorage {
             var sessionFuture = playerToSession.computeIfAbsent(playerId, k -> new CompletableFuture<>());
             return sessionFuture.get(futureSessionTimeoutMs, TimeUnit.MILLISECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            System.out.println(playerId);
+            System.out.println(playerToSession.entrySet());
             throw new MauTimeoutException("Not initialized in " + futureSessionTimeoutMs + " milliseconds.", e);
         }
     }
@@ -50,7 +54,7 @@ public class PlayerSessionStorage {
     }
 
     public PlayerConcurrentSources getPlayerSources(String playerId) {
-        return playerLocks.computeIfAbsent(playerId, k -> PlayerConcurrentSources.create());
+        return playerLocks.computeIfAbsent(playerId, ignore -> PlayerConcurrentSources.create());
     }
 
     private String dropSession(String sessionId) {
@@ -59,7 +63,10 @@ public class PlayerSessionStorage {
             throw new IllegalStateException("Unexpected error: player does not exist for session " + sessionId);
         }
         Optional.ofNullable(playerToSession.remove(playerId))
-                .flatMap(future -> Optional.ofNullable(future.getNow(null)))
+                .flatMap(future -> {
+                    System.out.println("removed "  + playerId);
+                    return Optional.ofNullable(future.getNow(null));
+                })
                 .ifPresent(session -> {
                     try {
                         session.close();
@@ -76,6 +83,7 @@ public class PlayerSessionStorage {
         sessionToPlayer.put(session.getId(), playerId);
         playerLocks.putIfAbsent(playerId, PlayerConcurrentSources.create());
         sessionFuture.complete(session);
+        log.debug("registered session {} with player {}", session.getId(), playerId);
     }
 
     public void registerGame(String playerId, Game game) {
@@ -86,7 +94,7 @@ public class PlayerSessionStorage {
         return Optional.ofNullable(playerToGame.get(playerId));
     }
 
-    public void removePlayerBySession(String sessionId) {
+    public String removePlayerBySession(String sessionId) {
         var playerId = dropSession(sessionId);
         Optional.ofNullable(playerToGame.get(playerId))
                 .ifPresent(game -> {
@@ -101,6 +109,7 @@ public class PlayerSessionStorage {
                         throw new IllegalStateException(e);
                     }
                 });
+        return playerId;
     }
 
     public void removePlayerById(String playerId) {
@@ -118,9 +127,14 @@ public class PlayerSessionStorage {
         playerToGame.remove(playerId);
     }
 
-    public record PlayerConcurrentSources(Lock lock, BlockingQueue<Action> queue) {
+    public record PlayerConcurrentSources(Lock lock, Queue<Runnable> queue) {
         public static PlayerConcurrentSources create() {
-            return new PlayerConcurrentSources(new ReentrantLock(), new LinkedBlockingQueue<>());
+            return new PlayerConcurrentSources(new ReentrantLock(), new ConcurrentLinkedQueue<>());
+        }
+
+        @Override
+        public String toString() {
+            return queue.stream().map(Object::toString).collect(Collectors.joining("\n"));
         }
     }
 }
