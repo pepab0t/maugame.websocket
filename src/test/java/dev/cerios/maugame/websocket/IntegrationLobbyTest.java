@@ -6,6 +6,7 @@ import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
 import org.json.JSONException;
 import org.junit.jupiter.api.*;
+import org.mockito.BDDMockito;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 
 import static dev.cerios.maugame.websocket.clientutils.JsonFactory.createReadyRequest;
 import static java.lang.System.out;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -183,12 +186,91 @@ class IntegrationLobbyTest {
         }
 
         var messages2 = client2.getReceivedMessages();
+        assertThat(messages2).hasSize(2);
         assertReadyMessage(messages2.getFirst(), "user2");
         assertUnreadyMessage(messages2.get(1), "user2");
 
         var messages3 = client3.getReceivedMessages();
+        assertThat(messages3).hasSize(2);
         assertReadyMessage(messages3.getFirst(), "user2");
         assertUnreadyMessage(messages3.get(1), "user2");
+    }
+
+    @Test
+    void whenPlayerSendsReadyTwice_thenStatusNotUpdateAndDontMessage() throws IOException, InterruptedException {
+        // given
+        Predicate<String> readyMatcher = message -> message.matches(".*:\\s*\"READY.*");
+        var client1 = new TestClient(
+                createConnectionUri("user1"),
+                readyMatcher,
+                TIMEOUT_MS
+        );
+        var client2 = new TestClient(
+                createConnectionUri("user2"),
+                readyMatcher,
+                TIMEOUT_MS
+        );
+
+        try (var s1 = client1.handshake().join(); var s2 = client2.handshake().join()) {
+            // when
+            s2.sendMessage(new TextMessage(createReadyRequest()));
+            s2.sendMessage(new TextMessage(createReadyRequest()));
+            client1.get();
+            client2.get();
+        }
+
+        // then
+        var messages1 = client1.getReceivedMessages();
+        assertThat(messages1).hasSize(1);
+        assertReadyMessage(messages1.getFirst(), "user2");
+
+        var messages2 = client2.getReceivedMessages();
+        assertThat(messages2).hasSize(1);
+        assertReadyMessage(messages1.getFirst(), "user2");
+    }
+
+    @Test
+    void when2PlayersInLobby1Ready_andAnotherPlayerConnects_thenChangeStatusOfJustReadyOne() throws IOException, InterruptedException {
+        // given
+        Predicate<String> readyMatcher = message -> message.matches(".*:\\s*\"(UN)?READY.*");
+        var client3 = new TestClient(
+                createConnectionUri("user3"),
+                readyMatcher,
+                TIMEOUT_MS
+        );
+        var client2 = new TestClient(
+                createConnectionUri("user2"),
+                readyMatcher,
+                TIMEOUT_MS
+        );
+
+        WebSocketSession s1 = null;
+        try (var s3 = client3.handshake().join(); var s2 = client2.handshake().join()) {
+            s3.sendMessage(new TextMessage(createReadyRequest()));
+            client2.get();
+            client3.get();
+
+            // when
+            s1 = client.handshake().join();
+            client2.get();
+            client3.get();
+        } finally {
+            if (s1 != null)
+                s1.close();
+        }
+
+        Thread.sleep(100);
+
+        // then
+        var messages3 = client3.getReceivedMessages();
+        assertThat(messages3).hasSize(2);
+        assertReadyMessage(messages3.getFirst(), "user3");
+        assertUnreadyMessage(messages3.get(1), "user3");
+
+        var messages2 =  client2.getReceivedMessages();
+        assertThat(messages2).hasSize(2);
+        assertReadyMessage(messages2.getFirst(), "user3");
+        assertUnreadyMessage(messages2.get(1), "user3");
     }
 
     private void assertRegisterAction(String jsonMessage, String expectedUsername) {
