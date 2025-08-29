@@ -141,7 +141,7 @@ class IntegrationLobbyTest {
         when(gameFactory.createGame(any(int.class), any(int.class))).thenReturn(gameMock);
         when(gameMock.registerPlayer(any(String.class), any()))
                 .thenReturn("id1", "id2", "id3");
-
+        when(gameMock.hasEnoughPlayers()).thenReturn(true);
         when(gameMock.getUuid()).thenReturn(UUID.randomUUID());
 
         // when
