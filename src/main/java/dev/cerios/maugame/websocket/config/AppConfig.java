@@ -2,6 +2,7 @@ package dev.cerios.maugame.websocket.config;
 
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.websocket.MauSettings;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +17,7 @@ public class AppConfig {
 
     @Bean
     public GameFactory gameFactory() {
-        return new GameFactory(new Random(), virtualExecutor());
+        return new GameFactory(new Random());
     }
 
     @Bean

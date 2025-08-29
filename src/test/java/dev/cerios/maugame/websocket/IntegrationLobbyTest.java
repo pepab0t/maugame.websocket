@@ -272,7 +272,6 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    @Disabled
     void whenPlayerAmountExceedsGameCapacity_thenShouldRegisterToAnotherGame() throws IOException, InterruptedException {
         // given
         mauSettings.setMaxPlayers(2);
@@ -303,7 +302,7 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    void whenNotEnoughPlayers_andPlayerIsReady_thenIgnore() throws IOException, InterruptedException {
+    void whenNotEnoughPlayers_andPlayerIsReady_thenIgnore() throws IOException {
         // given
         var client1 = new TestClient(createConnectionUri("user1_"), m -> m.matches(".*:\\s*\"READY.*"), 100);
 
