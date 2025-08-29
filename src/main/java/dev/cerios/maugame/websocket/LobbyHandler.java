@@ -112,25 +112,26 @@ public class LobbyHandler {
             }
             var game = playerData.val3();
 
-            var playerStates = games.get(game.getUuid());
-            if (playerStates == null) {
+            var gameData = games.get(game.getUuid());
+            if (gameData == null) {
                 throw new RuntimeException("Unexpected error: game " + game.getUuid() + " not found in lobby registry.");
             }
 
-            for (var it = playerStates.iterator(); it.hasNext(); ) {
-                var ps = it.next();
-                var otherPlayer = ps.val1();
+            for (var it = gameData.iterator(); it.hasNext(); ) {
+                var gd = it.next();
+                var otherPlayer = gd.val1();
                 if (otherPlayer.equals(playerId)) {
                     it.remove();
                 } else {
-                    ps.val3().setReady(false);
-                    for (var anotherPs : playerStates) {
-                        distributor.enqueueMessage(otherPlayer, ServerMessage.ofUnready(anotherPs.val2()));
+                    if (gd.val3().setReady(false)) {
+                        for (var anotherGd : gameData) {
+                            distributor.enqueueMessage(anotherGd.val1(), ServerMessage.ofUnready(gd.val2()));
+                        }
                     }
                 }
             }
 
-            if (playerStates.isEmpty()) {
+            if (gameData.isEmpty()) {
                 games.remove(game.getUuid());
             }
 

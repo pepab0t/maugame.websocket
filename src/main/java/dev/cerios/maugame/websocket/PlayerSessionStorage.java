@@ -2,7 +2,6 @@ package dev.cerios.maugame.websocket;
 
 import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.game.Game;
-import dev.cerios.maugame.mauengine.game.action.Action;
 import dev.cerios.maugame.websocket.exception.MauTimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -61,10 +60,7 @@ public class PlayerSessionStorage {
             throw new IllegalStateException("Unexpected error: player does not exist for session " + sessionId);
         }
         Optional.ofNullable(playerToSession.remove(playerId))
-                .flatMap(future -> {
-                    System.out.println("removed "  + playerId);
-                    return Optional.ofNullable(future.getNow(null));
-                })
+                .map(future -> future.getNow(null))
                 .ifPresent(session -> {
                     try {
                         session.close();

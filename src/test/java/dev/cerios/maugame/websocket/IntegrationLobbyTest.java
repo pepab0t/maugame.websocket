@@ -17,6 +17,7 @@ import org.springframework.web.socket.TextMessage;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static dev.cerios.maugame.websocket.clientutils.JsonFactory.createReadyRequest;
@@ -40,9 +41,13 @@ class IntegrationLobbyTest {
     @Autowired
     private LobbyHandler lobbyHandler;
 
+    @Autowired
+    private MauSettings mauSettings;
+
     @BeforeEach
     void setUp() {
         client = new TestClient(createConnectionUri("user1"), TIMEOUT_MS);
+        mauSettings.setMaxPlayers(3);
     }
 
     @AfterEach
@@ -136,6 +141,7 @@ class IntegrationLobbyTest {
 
         when(gameMock.getUuid()).thenReturn(UUID.randomUUID());
 
+        // when
         try (var s1 = client.handshake().join(); var s2 = client2.handshake().join(); var s3 = client3.handshake().join()) {
             s1.sendMessage(readyRequest);
             client3.get();
@@ -147,6 +153,42 @@ class IntegrationLobbyTest {
             // then
             verify(gameMock, timeout(TIMEOUT_MS)).start();
         }
+    }
+
+    @Test
+    void whenPlayerDisconnects_thenUpdateReadyOnlyThoseChanged() throws IOException, InterruptedException {
+        // given
+        Predicate<String> readyMatcher = message -> message.matches(".*:\\s*\"(UN)?READY.*");
+        var client2 = new TestClient(
+                createConnectionUri("user2"),
+                readyMatcher,
+                TIMEOUT_MS
+        );
+        var client3 = new TestClient(
+                createConnectionUri("user3"),
+                readyMatcher,
+                TIMEOUT_MS
+        );
+
+        try (var s1 = client.handshake().join(); var s2 = client2.handshake().join(); var s3 = client3.handshake().join()) {
+            s2.sendMessage(new TextMessage(createReadyRequest()));
+            client2.get();
+            client3.get();
+
+            // when
+            s1.close();
+
+            client2.get();
+            client3.get();
+        }
+
+        var messages2 = client2.getReceivedMessages();
+        assertReadyMessage(messages2.getFirst(), "user2");
+        assertUnreadyMessage(messages2.get(1), "user2");
+
+        var messages3 = client3.getReceivedMessages();
+        assertReadyMessage(messages3.getFirst(), "user2");
+        assertUnreadyMessage(messages3.get(1), "user2");
     }
 
     private void assertRegisterAction(String jsonMessage, String expectedUsername) {
