@@ -12,8 +12,4 @@ public interface Message {
     static ErrorMessage createErrorMessage(Exception exception) {
         return new ErrorMessage(exception);
     }
-
-    static ServerMessage createServerMessage(String message) {
-        return new ServerMessage(message);
-    }
 }

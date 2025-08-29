@@ -1,10 +1,8 @@
 package dev.cerios.maugame.websocket.wshandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.websocket.GameService;
 import dev.cerios.maugame.websocket.RequestProcessor;
-import dev.cerios.maugame.websocket.PlayerSessionStorage;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,22 +34,24 @@ public class GameHandler extends TextWebSocketHandler {
         String username = attributes.get("user").toString();
         Optional.ofNullable(attributes.get("player"))
                 .map(Object::toString)
-                .ifPresentOrElse(playerId -> {
-                    try {
-                        gameService.registerPlayer(username, session, playerId);
-                        log.info("{} {} reconnected on session {}", username, playerId, session.getId());
-                    } catch (NotFoundException e) {
-                        try {
-                            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(createErrorMessage(e))));
-                            session.close();
-                        } catch (IOException ex) {
-                            log.warn("cannot send websocket message", ex);
+                .ifPresentOrElse(
+                        playerId -> {
+                            try {
+                                gameService.registerPlayer(username, session, playerId);
+                                log.info("{} {} reconnected on session {}", username, playerId, session.getId());
+                            } catch (NotFoundException e) {
+                                try {
+                                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(createErrorMessage(e))));
+                                    session.close();
+                                } catch (IOException ex) {
+                                    log.warn("cannot send websocket message", ex);
+                                }
+                            }
+                        }, () -> {
+                            gameService.registerPlayer(username, session);
+                            log.info("{} joined the game on session {}", username, session.getId());
                         }
-                    }
-                }, () -> {
-                    gameService.registerPlayer(username, session);
-                    log.info("{} joined the game on session {}", username, session.getId());
-                });
+                );
     }
 
     @Override
@@ -64,6 +64,6 @@ public class GameHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        processor.process(session, message.getPayload());
+        processor.process(session.getId(), message.getPayload());
     }
 }

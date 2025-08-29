@@ -11,5 +11,5 @@ import org.springframework.stereotype.Component;
 @Data
 public class MauSettings {
     @Min(2)
-    private int maxPlayers = 2;
+    private volatile int maxPlayers = 2;
 }

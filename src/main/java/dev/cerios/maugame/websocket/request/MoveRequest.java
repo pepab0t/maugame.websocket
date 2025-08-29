@@ -1,13 +1,12 @@
 package dev.cerios.maugame.websocket.request;
 
-public class MoveRequest implements Request {
+import lombok.Data;
 
-    private final MoveRequestBody move;
+@Data
+public abstract class MoveRequest {
+    protected final RequestType.MoveType moveType;
 
-    public MoveRequest(MoveRequestBody move) {this.move = move;}
-
-    @Override
-    public RequestType requestType() {
-        return RequestType.MOVE;
+    public MoveRequest(RequestType.MoveType moveType) {
+        this.moveType = moveType;
     }
 }

@@ -1,16 +1,16 @@
 package dev.cerios.maugame.websocket.request;
 
-import dev.cerios.maugame.websocket.exception.InvalidCommandException;
-
 public enum RequestType {
     MOVE,
     CONTROL;
 
-    public static RequestType fromString(String type) throws InvalidCommandException {
-        try {
-            return RequestType.valueOf(type);
-        } catch (IllegalArgumentException e) {
-            throw new InvalidCommandException(e.getMessage());
-        }
+    public enum MoveType {
+        PLAY,
+        DRAW,
+        PASS;
+    }
+
+    public enum ControlType {
+        READY
     }
 }
