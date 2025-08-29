@@ -34,8 +34,6 @@ public class PlayerSessionStorage {
             var sessionFuture = playerToSession.computeIfAbsent(playerId, k -> new CompletableFuture<>());
             return sessionFuture.get(futureSessionTimeoutMs, TimeUnit.MILLISECONDS);
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
-            System.out.println(playerId);
-            System.out.println(playerToSession.entrySet());
             throw new MauTimeoutException("Not initialized in " + futureSessionTimeoutMs + " milliseconds.", e);
         }
     }
