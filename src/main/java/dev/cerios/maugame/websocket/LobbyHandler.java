@@ -68,12 +68,13 @@ public class LobbyHandler {
                 throw new RuntimeException("Unexpected error: Player " + playerId + " not found in lobby registry.");
             }
 
-            var gameData = games.get(playerData.val3().getUuid());
+            var game = playerData.val3();
+            var gameData = games.get(game.getUuid());
             if (gameData == null || gameData.isEmpty()) {
-                throw new RuntimeException("Unexpected error: game " + playerData.val3().getUuid() + " not found in lobby registry.");
+                throw new RuntimeException("Unexpected error: game " + game.getUuid() + " not found in lobby registry.");
             }
 
-            if (!playerData.val2().setReady(true)) { // only if state changed
+            if (!game.hasEnoughPlayers() || !playerData.val2().setReady(true)) { // only if state changed
                 return;
             }
 
@@ -84,7 +85,6 @@ public class LobbyHandler {
             if (!gameData.stream().allMatch(ps -> ps.val3().isReady()))
                 return;
 
-            var game = playerData.val3();
             gameQueue.remove(game.getUuid());
             games.remove(game.getUuid());
             for (var gd : gameData) {

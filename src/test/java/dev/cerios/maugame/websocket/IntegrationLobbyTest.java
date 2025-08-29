@@ -6,7 +6,6 @@ import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
 import org.json.JSONException;
 import org.junit.jupiter.api.*;
-import org.mockito.BDDMockito;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +24,7 @@ import java.util.stream.Collectors;
 import static dev.cerios.maugame.websocket.clientutils.JsonFactory.createReadyRequest;
 import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -259,18 +259,60 @@ class IntegrationLobbyTest {
                 s1.close();
         }
 
-        Thread.sleep(100);
-
         // then
         var messages3 = client3.getReceivedMessages();
         assertThat(messages3).hasSize(2);
         assertReadyMessage(messages3.getFirst(), "user3");
         assertUnreadyMessage(messages3.get(1), "user3");
 
-        var messages2 =  client2.getReceivedMessages();
+        var messages2 = client2.getReceivedMessages();
         assertThat(messages2).hasSize(2);
         assertReadyMessage(messages2.getFirst(), "user3");
         assertUnreadyMessage(messages2.get(1), "user3");
+    }
+
+    @Test
+    @Disabled
+    void whenPlayerAmountExceedsGameCapacity_thenShouldRegisterToAnotherGame() throws IOException, InterruptedException {
+        // given
+        mauSettings.setMaxPlayers(2);
+        Predicate<String> messageMatcher = message -> message.matches(".*:\\s*\"START_GAME.*");
+        var client1 = new TestClient(createConnectionUri("user1_"), messageMatcher, TIMEOUT_MS);
+        var client2 = new TestClient(createConnectionUri("user2"), messageMatcher, TIMEOUT_MS);
+        var client3 = new TestClient(createConnectionUri("user3"), messageMatcher, TIMEOUT_MS);
+        var client4 = new TestClient(createConnectionUri("user4"), messageMatcher, TIMEOUT_MS);
+
+        // when
+        try (var s1 = client1.handshake().join();
+             var s2 = client2.handshake().join();
+             var s3 = client3.handshake().join();
+             var s4 = client4.handshake().join()) {
+            s1.sendMessage(new TextMessage(createReadyRequest()));
+            s2.sendMessage(new TextMessage(createReadyRequest()));
+            s3.sendMessage(new TextMessage(createReadyRequest()));
+            s4.sendMessage(new TextMessage(createReadyRequest()));
+            var m1 = client1.get();
+            var m2 = client2.get();
+            var m3 = client3.get();
+            var m4 = client4.get();
+            // then
+            assertThat(m1).isEqualTo(m2);
+            assertThat(m3).isEqualTo(m4);
+            assertThat(m4).isNotEqualTo(m1);
+        }
+    }
+
+    @Test
+    void whenNotEnoughPlayers_andPlayerIsReady_thenIgnore() throws IOException, InterruptedException {
+        // given
+        var client1 = new TestClient(createConnectionUri("user1_"), m -> m.matches(".*:\\s*\"READY.*"), 100);
+
+        // when
+        try (var session = client1.handshake().join()) {
+            session.sendMessage(new TextMessage(createReadyRequest()));
+            assertThatThrownBy(client1::get)
+                .isInstanceOf(InterruptedException.class);
+        }
     }
 
     private void assertRegisterAction(String jsonMessage, String expectedUsername) {
