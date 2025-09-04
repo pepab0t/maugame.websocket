@@ -5,9 +5,10 @@ import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
-import lombok.Cleanup;
 import org.json.JSONException;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +20,6 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -32,7 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-//@TestMethodOrder(MethodOrderer.Random.class)
+        //@TestMethodOrder(MethodOrderer.Random.class)
 class IntegrationLobbyTest {
 
     @LocalServerPort
@@ -527,7 +527,91 @@ class IntegrationLobbyTest {
             if (session != null)
                 session.close();
         }
+    }
 
+    @Test
+    void shouldRegisterToExistingPrivateLobby() throws IOException {
+        // given
+        final var lobbyName = "private_lobby";
+        final Predicate<String> registerMatcher = m -> m.contains("REGISTER_PLAYER");
+        var client2 = new TestClient(createConnectionUri("user2", lobbyName, true, true), registerMatcher, TIMEOUT_MS);
+        var client3 = new TestClient(createConnectionUri("user3", lobbyName, false, true), registerMatcher, TIMEOUT_MS);
+
+        // when
+        try (var ignore2 = client2.handshakeWithCatch().join();
+             var ignore3 = client3.handshakeWithCatch().join()) {
+        }
+
+        // then
+        var message2 = client2.getReceivedMessages().getFirst();
+        var message3 = client3.getReceivedMessages().getFirst();
+
+        var game2 = JsonPath.<String>read(message2, "$.action.gameId");
+        var game3 = JsonPath.<String>read(message3, "$.action.gameId");
+        assertThat(game2).isNotBlank();
+        assertThat(game3).isEqualTo(game2);
+    }
+
+    @Test
+    void shouldRegisterToExistingPublicLobby() throws IOException {
+        // given
+        final var lobbyName = "private_lobby";
+        final Predicate<String> registerMatcher = m -> m.contains("REGISTER_PLAYER");
+        var client2 = new TestClient(createConnectionUri("user2", lobbyName, true, false), registerMatcher, TIMEOUT_MS);
+        var client3 = new TestClient(createConnectionUri("user3", lobbyName, false, false), registerMatcher, TIMEOUT_MS);
+
+        // when
+        try (var ignore2 = client2.handshakeWithCatch().join();
+             var ignore3 = client3.handshakeWithCatch().join()) {
+        }
+
+        // then
+        var message2 = client2.getReceivedMessages().getFirst();
+        var message3 = client3.getReceivedMessages().getFirst();
+
+        var game2 = JsonPath.<String>read(message2, "$.action.gameId");
+        var game3 = JsonPath.<String>read(message3, "$.action.gameId");
+        assertThat(game2).isNotBlank();
+        assertThat(game3).isEqualTo(game2);
+    }
+
+    @Test
+    void whenTwoUsersCreateSameNamedLobby_thenOneShouldGetError() throws IOException, JSONException {
+        // given
+        var client2 = new TestClient(
+                createConnectionUri("user2", "existing_lobby", true, true),
+                TIMEOUT_MS
+        );
+
+        var client3 = new TestClient(
+                createConnectionUri("user3", "existing_lobby", true, false),
+                TIMEOUT_MS
+        );
+
+        // when
+        try (var ignore2 = client2.handshakeWithCatch().join();
+             var ignore3 = client3.handshakeWithCatch().join()) {
+        }
+
+        // then
+        var message2 = client2.getReceivedMessages().getFirst();
+        var message3 = client3.getReceivedMessages().getFirst();
+
+        out.println(message2);
+        out.println(message3);
+
+        assertRegisterAction(message2, "user2");
+        JSONAssert.assertEquals(
+                """
+                        {
+                          "messageType": "ERROR",
+                          "exceptionBody": {
+                            "name": "LobbyAlreadyExistsException",
+                            "message": "existing_lobby"
+                          }
+                        }
+                        """, message3, JSONCompareMode.LENIENT
+        );
     }
 
     private void assertRegisterAction(String jsonMessage, String expectedUsername) {

@@ -4,6 +4,7 @@ import dev.cerios.maugame.mauengine.card.Card;
 import dev.cerios.maugame.mauengine.card.Color;
 import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
+import dev.cerios.maugame.websocket.exception.LobbyAlreadyExistsException;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +18,7 @@ public class GameService {
     private final PlayerSessionStorage storage;
     private final LobbyHandler lobbyHandler;
 
-    public void registerPlayerToNewCustomLobby(String username, WebSocketSession session, String lobbyName, boolean isPrivate) {
+    public void registerPlayerToNewCustomLobby(String username, WebSocketSession session, String lobbyName, boolean isPrivate) throws LobbyAlreadyExistsException {
         try {
             String playerId = isPrivate ?
                     lobbyHandler.registerToNewPrivateLobby(username, lobbyName) :
@@ -31,7 +32,7 @@ public class GameService {
 
     public void registerPlayerToExistingCustomLobby(String username, WebSocketSession session, String lobbyName) throws NotFoundException {
         try {
-            String playerId = lobbyHandler.registerPlayerToExistingPrivateLobby(username, lobbyName);
+            String playerId = lobbyHandler.registerPlayerToExistingLobby(username, lobbyName);
             storage.registerSession(playerId, session);
             log.info("player `{}` assigned to id `{}` (session `{}`)", username, playerId, session.getId());
         } catch (GameException e) {

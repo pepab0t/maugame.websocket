@@ -5,6 +5,7 @@ import dev.cerios.maugame.websocket.GameService;
 import dev.cerios.maugame.websocket.RequestProcessor;
 import dev.cerios.maugame.websocket.exception.InvalidHandshakeException;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
+import dev.cerios.maugame.websocket.exception.ServerException;
 import dev.cerios.maugame.websocket.message.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +34,6 @@ public class GameHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession s) {
-        // TODO connection parameter parser
         final var session = new ConcurrentWebSocketSessionDecorator(s, 10_000, 4096);
 
         try {
@@ -44,7 +44,7 @@ public class GameHandler extends TextWebSocketHandler {
                 case CREATE -> gameService.registerPlayerToNewCustomLobby(cp.username(), session, cp.lobbyName().get(), cp.isPrivate());
                 case RECONNECT -> gameService.reconnectPlayer(cp.username(), session, cp.playerId().get());
             }
-        } catch (InvalidHandshakeException | NotFoundException e) {
+        } catch (ServerException e) {
             try {
                 session.sendMessage(new TextMessage(objectMapper.writeValueAsString(Message.createErrorMessage(e))));
                 session.close();
@@ -52,9 +52,6 @@ public class GameHandler extends TextWebSocketHandler {
                 log.warn("Error interacting with session", ex);
             }
         }
-    }
-
-    record Params(Integer x) {
     }
 
     @Override

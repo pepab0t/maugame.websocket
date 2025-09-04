@@ -4,6 +4,7 @@ import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
+import dev.cerios.maugame.websocket.exception.LobbyAlreadyExistsException;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
 import dev.cerios.maugame.websocket.message.ServerMessage;
 import jakarta.annotation.Nullable;
@@ -37,9 +38,12 @@ public class LobbyHandler {
 
     private final Lock lock = new ReentrantLock();
 
-    public String registerToNewPublicLobby(String username, String lobbyName) throws GameException {
+    public String registerToNewPublicLobby(String username, String lobbyName) throws GameException, LobbyAlreadyExistsException {
         try {
             lock.lock();
+            if (lobbiesQueueReferences.containsKey(lobbyName) || privateLobbies.containsKey(lobbyName)) {
+                throw new LobbyAlreadyExistsException(lobbyName);
+            }
             var newGame = gameFactory.createGame(2, mauSettings.getMaxPlayers());
             lobbiesQueueReferences.put(lobbyName, newGame.getUuid());
             gameQueue.putLast(newGame.getUuid(), newGame);
@@ -49,9 +53,12 @@ public class LobbyHandler {
         }
     }
 
-    public String registerToNewPrivateLobby(String username, String lobbyName) throws GameException {
+    public String registerToNewPrivateLobby(String username, String lobbyName) throws GameException, LobbyAlreadyExistsException {
         try {
             lock.lock();
+            if (lobbiesQueueReferences.containsKey(lobbyName) || privateLobbies.containsKey(lobbyName)) {
+                throw new LobbyAlreadyExistsException(lobbyName);
+            }
             var newGame = gameFactory.createGame(2, mauSettings.getMaxPlayers());
             privateLobbies.put(lobbyName, newGame);
             return registerPlayer(username, newGame, lobbyName);
@@ -60,7 +67,7 @@ public class LobbyHandler {
         }
     }
 
-    public String registerPlayerToExistingPrivateLobby(String username, String lobbyName) throws GameException, NotFoundException {
+    public String registerPlayerToExistingLobby(String username, String lobbyName) throws GameException, NotFoundException {
         try {
             lock.lock();
             var game = privateLobbies.get(lobbyName);

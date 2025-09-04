@@ -28,6 +28,18 @@ public class TestClient extends StandardWebSocketClient {
         return this.execute(handler, uriTemplate);
     }
 
+    /**
+     * Perform websocket handshake and waits for first websocket message.
+     * @return future with opened session
+     */
+    public CompletableFuture<WebSocketSession> handshakeWithCatch() {
+        return this.execute(handler, uriTemplate)
+                .thenApply(s -> {
+                    this.get();
+                    return s;
+                });
+    }
+
     public List<String> getReceivedMessages() {
         return handler.getReceivedMessages();
     }
