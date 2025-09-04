@@ -4,7 +4,9 @@ import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
+import dev.cerios.maugame.websocket.exception.NotFoundException;
 import dev.cerios.maugame.websocket.message.ServerMessage;
+import jakarta.annotation.Nullable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
@@ -27,34 +29,59 @@ public class LobbyHandler {
     private final MessageDistributor distributor;
 
     private final SequencedMap<UUID, Game> gameQueue = new LinkedHashMap<>();
-    private final Map<String, Group<String, ReadyState, Game>> players = new HashMap<>();
-    private final Map<UUID, List<Group<String, String, ReadyState>>> games = new HashMap<>();
+    private final Map<String, UUID> lobbiesQueueReferences = new HashMap<>();
+    private final Map<String, Game> privateLobbies = new HashMap<>();
+
+    private final Map<String, PlayerData> players = new HashMap<>();
+    private final Map<UUID, List<Group3<String, String, ReadyState>>> games = new HashMap<>();
 
     private final Lock lock = new ReentrantLock();
 
-    public String registerPlayer(String username) throws GameException {
+    public String registerToNewPublicLobby(String username, String lobbyName) throws GameException {
+        try {
+            lock.lock();
+            var newGame = gameFactory.createGame(2, mauSettings.getMaxPlayers());
+            lobbiesQueueReferences.put(lobbyName, newGame.getUuid());
+            gameQueue.putLast(newGame.getUuid(), newGame);
+            return registerPlayer(username, newGame, lobbyName);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String registerToNewPrivateLobby(String username, String lobbyName) throws GameException {
+        try {
+            lock.lock();
+            var newGame = gameFactory.createGame(2, mauSettings.getMaxPlayers());
+            privateLobbies.put(lobbyName, newGame);
+            return registerPlayer(username, newGame, lobbyName);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String registerPlayerToExistingPrivateLobby(String username, String lobbyName) throws GameException, NotFoundException {
+        try {
+            lock.lock();
+            var game = privateLobbies.get(lobbyName);
+            if (game == null) {
+                var gameId = lobbiesQueueReferences.get(lobbyName);
+                if (gameId == null) {
+                    throw new NotFoundException(String.format("Lobby with name `%s` not found.", lobbyName));
+                }
+                game = gameQueue.get(gameId);
+            }
+            return registerPlayer(username, game, lobbyName);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public String registerPlayerToRandomLobby(String username) throws GameException {
         try {
             lock.lock();
             var game = getOrCreateGame();
-            var playerId = game.registerPlayer(username, messageDistributor::distribute);
-            var ready = new ReadyState();
-            players.put(playerId, new Group<>(username, ready, game));
-            var gameData = games.computeIfAbsent(game.getUuid(), k -> new LinkedList<>());
-
-            for (var original : gameData) {
-                if (original.val3().setReady(false)) { // only if state changed
-                    for (var gd : gameData) {
-                        distributor.enqueueMessage(gd.val1(), ServerMessage.ofUnready(original.val2()));
-                    }
-                }
-            }
-
-            gameData.add(new Group<>(playerId, username, ready));
-
-            if (game.getFreeCapacity() == 0)
-                gameQueue.pollFirstEntry();
-
-            return playerId;
+            return registerPlayer(username, game, null);
         } finally {
             lock.unlock();
         }
@@ -68,18 +95,18 @@ public class LobbyHandler {
                 throw new RuntimeException("Unexpected error: Player " + playerId + " not found in lobby registry.");
             }
 
-            var game = playerData.val3();
+            var game = playerData.game();
             var gameData = games.get(game.getUuid());
             if (gameData == null || gameData.isEmpty()) {
                 throw new RuntimeException("Unexpected error: game " + game.getUuid() + " not found in lobby registry.");
             }
 
-            if (!game.hasEnoughPlayers() || !playerData.val2().setReady(true)) { // only if state changed
+            if (!game.hasEnoughPlayers() || !playerData.ready().setReady(true)) { // only if state changed
                 return;
             }
 
             for (var gd : gameData) {
-                distributor.enqueueMessage(gd.val1(), ServerMessage.ofReady(playerData.val1()));
+                distributor.enqueueMessage(gd.val1(), ServerMessage.ofReady(playerData.username()));
             }
 
             if (!gameData.stream().allMatch(ps -> ps.val3().isReady()))
@@ -110,7 +137,7 @@ public class LobbyHandler {
             if (playerData == null) {
                 return;
             }
-            var game = playerData.val3();
+            var game = playerData.game();
 
             var gameData = games.get(game.getUuid());
             if (gameData == null) {
@@ -147,6 +174,39 @@ public class LobbyHandler {
         }
     }
 
+    private String registerPlayer(String username, Game game, String lobbyName) throws GameException {
+        var playerId = game.registerPlayer(username, messageDistributor::distribute);
+        var ready = new ReadyState();
+        players.put(playerId, new PlayerData(username, ready, game, lobbyName));
+        var gameData = games.computeIfAbsent(game.getUuid(), k -> new LinkedList<>());
+
+        for (var original : gameData) {
+            if (original.val3().setReady(false)) { // only if state changed
+                for (var gd : gameData) {
+                    distributor.enqueueMessage(gd.val1(), ServerMessage.ofUnready(original.val2()));
+                }
+            }
+        }
+
+        gameData.add(new Group3<>(playerId, username, ready));
+
+        if (game.getFreeCapacity() > 0)
+            return playerId;
+
+        if (lobbyName == null)
+            gameQueue.pollFirstEntry();
+        else {
+            var lobbyId = lobbiesQueueReferences.remove(lobbyName);
+            if (lobbyId == null) {
+                privateLobbies.remove(lobbyName);
+            } else {
+                gameQueue.remove(lobbyId);
+            }
+        }
+
+        return playerId;
+    }
+
     private Game getOrCreateGame() {
         return Optional.ofNullable(gameQueue.firstEntry())
                 .map(Map.Entry::getValue)
@@ -163,12 +223,17 @@ public class LobbyHandler {
             this.games.clear();
             this.players.clear();
             this.gameQueue.clear();
+            this.lobbiesQueueReferences.clear();
+            this.privateLobbies.clear();
         }  finally {
             lock.unlock();
         }
     }
 
-    private record Group<T1, T2, T3>(T1 val1, T2 val2, T3 val3) {
+    private record PlayerData(String username, ReadyState ready, Game game, @Nullable String lobbyName) {
+    }
+
+    private record Group3<T1, T2, T3>(T1 val1, T2 val2, T3 val3) {
     }
 
     @Getter

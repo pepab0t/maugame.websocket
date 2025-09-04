@@ -32,11 +32,19 @@ public class TestClient extends StandardWebSocketClient {
         return handler.getReceivedMessages();
     }
 
-    public String get() throws InterruptedException {
-        return this.handler.get();
+    public String get() {
+        try {
+            return this.handler.get();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public List<String> get(int n) throws InterruptedException {
-        return this.handler.get(n);
+    public List<String> get(int n) {
+        try {
+            return this.handler.get(n);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

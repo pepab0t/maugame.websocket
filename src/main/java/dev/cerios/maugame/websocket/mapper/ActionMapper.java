@@ -50,7 +50,7 @@ public abstract class ActionMapper {
     public abstract PlayerShiftActionDto toDto(PlayerShiftAction action);
 
     @Mapping(target = "playerDto", expression = "java(mapRegisterPlayer(action))")
-    public abstract PlayerActionDto toDto(RegisterAction action);
+    public abstract RegisterActionDto toDto(RegisterAction action);
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
     public abstract RemovePlayerActionDto toDto(RemovePlayerAction action);

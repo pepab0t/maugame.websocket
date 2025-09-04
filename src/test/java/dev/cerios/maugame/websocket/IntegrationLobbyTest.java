@@ -1,9 +1,11 @@
 package dev.cerios.maugame.websocket;
 
+import com.jayway.jsonpath.JsonPath;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
+import lombok.Cleanup;
 import org.json.JSONException;
 import org.junit.jupiter.api.*;
 import org.skyscreamer.jsonassert.JSONAssert;
@@ -17,6 +19,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -29,7 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@TestMethodOrder(MethodOrderer.Random.class)
+//@TestMethodOrder(MethodOrderer.Random.class)
 class IntegrationLobbyTest {
 
     @LocalServerPort
@@ -59,7 +62,7 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    void shouldReceiveRegisterActions() throws IOException, InterruptedException {
+    void shouldReceiveRegisterActions() throws IOException {
         // setup
         var client2 = new TestClient(createConnectionUri("user2"), TIMEOUT_MS);
         List<String> messages1;
@@ -71,7 +74,7 @@ class IntegrationLobbyTest {
             messages2 = client2.get(2);
         }
 
-        messages1.forEach(System.out::println);
+        messages1.forEach(out::println);
 
         // then
         assertRegisterAction(messages1.getFirst(), "user1");
@@ -125,7 +128,7 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    void whenAllPlayerReady_thenGameStartsAndLobbyDisappears() throws IOException, MauEngineBaseException, InterruptedException {
+    void whenAllPlayerReady_thenGameStartsAndLobbyDisappears() throws IOException, MauEngineBaseException {
         // given
         var client2 = new TestClient(
                 createConnectionUri("user2"),
@@ -159,7 +162,7 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    void whenPlayerDisconnects_thenUpdateReadyOnlyThoseChanged() throws IOException, InterruptedException {
+    void whenPlayerDisconnects_thenUpdateReadyOnlyThoseChanged() throws IOException {
         // given
         Predicate<String> readyMatcher = message -> message.matches(".*:\\s*\"(UN)?READY.*");
         var client2 = new TestClient(
@@ -197,7 +200,7 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    void whenPlayerSendsReadyTwice_thenStatusNotUpdateAndDontMessage() throws IOException, InterruptedException {
+    void whenPlayerSendsReadyTwice_thenStatusNotUpdateAndDontMessage() throws IOException {
         // given
         Predicate<String> readyMatcher = message -> message.matches(".*:\\s*\"READY.*");
         var client1 = new TestClient(
@@ -230,7 +233,7 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    void when2PlayersInLobby1Ready_andAnotherPlayerConnects_thenChangeStatusOfJustReadyOne() throws IOException, InterruptedException {
+    void when2PlayersInLobby1Ready_andAnotherPlayerConnects_thenChangeStatusOfJustReadyOne() throws IOException {
         // given
         Predicate<String> readyMatcher = message -> message.matches(".*:\\s*\"(UN)?READY.*");
         var client3 = new TestClient(
@@ -272,7 +275,7 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    void whenPlayerAmountExceedsGameCapacity_thenShouldRegisterToAnotherGame() throws IOException, InterruptedException {
+    void whenPlayerAmountExceedsGameCapacity_thenShouldRegisterToAnotherGame() throws IOException {
         // given
         mauSettings.setMaxPlayers(2);
         Predicate<String> messageMatcher = message -> message.matches(".*:\\s*\"START_GAME.*");
@@ -310,8 +313,221 @@ class IntegrationLobbyTest {
         try (var session = client1.handshake().join()) {
             session.sendMessage(new TextMessage(createReadyRequest()));
             assertThatThrownBy(client1::get)
-                .isInstanceOf(InterruptedException.class);
+                    .isInstanceOf(RuntimeException.class);
         }
+    }
+
+    @Test
+    void whenUserConnectsWithInvalidParams_thenRespondAndClose() throws IOException, JSONException {
+        // when
+        var client1 = new TestClient(createConnectionUri("   "), 100);
+        String message;
+        try (var ignore = client1.handshake().join()) {
+            message = client1.get();
+        }
+
+        // then
+        JSONAssert.assertEquals(
+                """
+                        {
+                          "messageType": "ERROR",
+                          "exceptionBody": {
+                            "name": "InvalidHandshakeException"
+                          }
+                        }
+                        """, message, JSONCompareMode.LENIENT
+        );
+    }
+
+    @Test
+    void whenRegisterUserToRandomAndCustomPrivate_thenTheyShouldObtainDifferentGameId() throws IOException {
+        var client2 = new TestClient(
+                createConnectionUri("user2", "custom_lobby", true, true),
+                m -> m.contains("REGISTER_PLAYER"),
+                TIMEOUT_MS
+        );
+
+        try (var ignore = client.handshake().join();
+             var ignore2 = client2.handshake().join()) {
+
+            var game1 = JsonPath.<String>read(client.get(), "$.action.gameId");
+            var game2 = JsonPath.<String>read(client2.get(), "$.action.gameId");
+
+            assertThat(game1).isNotBlank();
+            assertThat(game2).isNotBlank();
+
+            assertThat(game1).isNotEqualTo(game2);
+        }
+    }
+
+    @Test
+    void whenRegisterUserToRandomAndCustomPublic_thenTheyShouldObtainDifferentGameId() throws IOException {
+        // given
+        var client2 = new TestClient(
+                createConnectionUri("user2", "custom_lobby", true, true),
+                m -> m.contains("REGISTER_PLAYER"),
+                TIMEOUT_MS
+        );
+
+        WebSocketSession session = null;
+        WebSocketSession session2 = null;
+
+        try {
+            // when
+            session = client.handshake().join();
+            var message = client.get();
+            session2 = client2.handshake().join();
+            var message2 = client2.get();
+
+            // then
+            var game1 = JsonPath.<String>read(message, "$.action.gameId");
+            var game2 = JsonPath.<String>read(message2, "$.action.gameId");
+
+            assertThat(game1).isNotBlank();
+            assertThat(game2).isNotBlank();
+            assertThat(game1).isNotEqualTo(game2);
+        } finally {
+            if (session != null)
+                session.close();
+            if (session2 != null)
+                session2.close();
+        }
+    }
+
+    @Test
+    void whenRegisterUserToCustomExistingLobby_thatNotExists_thenInformHim() throws IOException, JSONException {
+        // given
+        var client2 = new TestClient(createConnectionUri("user2", "custom_lobby", false, false), TIMEOUT_MS);
+
+        // when
+        try (var ignore = client2.handshake().join()) {
+            // then
+            JSONAssert.assertEquals(
+                    """
+                            {
+                              "messageType": "ERROR",
+                              "exceptionBody": {
+                                "name": "NotFoundException"
+                              }
+                            }
+                            """, client2.get(), JSONCompareMode.LENIENT
+            );
+        }
+    }
+
+    @Test
+    void whenRegisterToCustomPublicAndRandom_thenUsersShouldGetSameGameId() throws IOException {
+        // given
+        var client2 = new TestClient(
+                createConnectionUri("user2", "custom_lobby", true, false),
+                m -> m.contains("REGISTER_PLAYER"),
+                TIMEOUT_MS
+        );
+
+        WebSocketSession session = null;
+        WebSocketSession session2 = null;
+        try {
+            // when
+            session2 = client2.handshake().join();
+            var message2 = client2.get();
+
+            session = client.handshake().join();
+            var message = client.get();
+
+            // then
+            var game2 = JsonPath.<String>read(message2, "$.action.gameId");
+            var game = JsonPath.<String>read(message, "$.action.gameId");
+
+            assertThat(game).isNotBlank();
+            assertThat(game2).isEqualTo(game);
+        } finally {
+            if (session2 != null)
+                session2.close();
+            if (session != null)
+                session.close();
+        }
+    }
+
+    @Test
+    void whenBothPlayerRegisterToCustomLobby_thenShouldGetSameGameId() throws IOException {
+        // given
+        var client2 = new TestClient(
+                createConnectionUri("user2", "custom_lobby", true, false),
+                m -> m.contains("REGISTER_PLAYER"),
+                TIMEOUT_MS
+        );
+        var client3 = new TestClient(
+                createConnectionUri("user3", "custom_lobby", false, false),
+                m -> m.contains("REGISTER_PLAYER"),
+                TIMEOUT_MS
+        );
+
+        WebSocketSession session2 = null;
+        WebSocketSession session3 = null;
+
+        try {
+            // when
+            session2 = client2.handshake().join();
+            var message2 = client2.get();
+            session3 = client3.handshake().join();
+            var message3 = client3.get();
+
+            // then
+            var game2 = JsonPath.<String>read(message2, "$.action.gameId");
+            var game3 = JsonPath.<String>read(message3, "$.action.gameId");
+
+            assertThat(game2).isNotBlank();
+            assertThat(game3).isEqualTo(game2);
+        } finally {
+            if (session2 != null)
+                session2.close();
+            if (session3 != null)
+                session3.close();
+        }
+    }
+
+    @Test
+    void whenOneUserCreatesPublicLobby_otherConnectsToIt_anotherConnectsToRandom_thenAllShouldGetSameGameId() throws IOException {
+        // given
+        var client2 = new TestClient(
+                createConnectionUri("user2", "custom_lobby", true, false),
+                m -> m.contains("REGISTER_PLAYER"),
+                TIMEOUT_MS
+        );
+        var client3 = new TestClient(
+                createConnectionUri("user3", "custom_lobby", false, false),
+                m -> m.contains("REGISTER_PLAYER"),
+                TIMEOUT_MS
+        );
+
+        WebSocketSession session = null;
+        WebSocketSession session2 = null;
+        WebSocketSession session3 = null;
+
+        try {
+            session2 = client2.handshake().join();
+            var message2 = client2.get();
+            session3 = client3.handshake().join();
+            var message3 = client3.get();
+            session = client.handshake().join();
+            var message = client.get();
+
+            var game = JsonPath.<String>read(message, "$.action.gameId");
+            var game2 = JsonPath.<String>read(message2, "$.action.gameId");
+            var game3 = JsonPath.<String>read(message3, "$.action.gameId");
+
+            assertThat(game).isNotBlank();
+            assertThat(game2).isEqualTo(game);
+            assertThat(game3).isEqualTo(game2);
+        } finally {
+            if (session2 != null)
+                session2.close();
+            if (session3 != null)
+                session3.close();
+            if (session != null)
+                session.close();
+        }
+
     }
 
     private void assertRegisterAction(String jsonMessage, String expectedUsername) {
@@ -407,5 +623,16 @@ class IntegrationLobbyTest {
 
     private String createConnectionUri(String username) {
         return String.format("ws://localhost:%d/game?user=%s", port, username);
+    }
+
+    private String createConnectionUri(String username, String lobbyName, boolean isNew, boolean isPrivate) {
+        return String.format(
+                "ws://localhost:%d/game?user=%s&lobby=%s&new=%s&private=%s",
+                port,
+                username,
+                lobbyName,
+                isNew,
+                isPrivate
+        );
     }
 }
