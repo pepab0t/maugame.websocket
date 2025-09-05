@@ -24,7 +24,7 @@ public class QueryParamInterceptor implements HandshakeInterceptor {
                 String[] parts = pair.split("=");
                 if (parts.length == 2) {
                     attributes.put(parts[0], parts[1]);
-                    if (parts[0].equals("user")) {
+                    if (!userParamFound && (parts[0].equals("user") || parts[0].equals("player"))) {
                         userParamFound = true;
                     }
                 }

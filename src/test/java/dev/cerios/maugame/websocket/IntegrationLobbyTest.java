@@ -4,6 +4,7 @@ import com.jayway.jsonpath.JsonPath;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
+import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
 import org.json.JSONException;
 import org.junit.jupiter.api.AfterEach;
@@ -143,7 +144,7 @@ class IntegrationLobbyTest {
         var gameMock = mock(Game.class);
         when(gameFactory.createGame(any(int.class), any(int.class))).thenReturn(gameMock);
         when(gameMock.registerPlayer(any(String.class), any()))
-                .thenReturn("id1", "id2", "id3");
+                .thenReturn(new Player("id1", null, null), new Player("id2", null, null), new Player("id3", null, null));
         when(gameMock.hasEnoughPlayers()).thenReturn(true);
         when(gameMock.getUuid()).thenReturn(UUID.randomUUID());
 
@@ -706,17 +707,10 @@ class IntegrationLobbyTest {
     }
 
     private String createConnectionUri(String username) {
-        return String.format("ws://localhost:%d/game?user=%s", port, username);
+        return TestClient.createConnectionUri(port, username);
     }
 
     private String createConnectionUri(String username, String lobbyName, boolean isNew, boolean isPrivate) {
-        return String.format(
-                "ws://localhost:%d/game?user=%s&lobby=%s&new=%s&private=%s",
-                port,
-                username,
-                lobbyName,
-                isNew,
-                isPrivate
-        );
+        return TestClient.createConnectionUri(port, username, lobbyName, isNew, isPrivate);
     }
 }

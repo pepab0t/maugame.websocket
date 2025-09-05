@@ -27,6 +27,10 @@ public class ServerMessage implements Message {
         return new ServerMessage(new InfoMessageBody(message));
     }
 
+    public static ServerMessage ofDisconnect(String username) { return new ServerMessage(new DisconnectMessageBody(username)); }
+
+    public static ServerMessage ofReconnect(String username) { return new ServerMessage(new ReconnectMessageBody(username)); }
+
     @Getter
     @ToString
     public abstract static class MessageBody {
@@ -41,6 +45,8 @@ public class ServerMessage implements Message {
     public enum BodyType {
         READY,
         UNREADY,
+        DISCONNECT,
+        RECONNECT,
         INFO
     }
 
@@ -77,6 +83,27 @@ public class ServerMessage implements Message {
             super(BodyType.UNREADY);
             this.username = username;
         }
+    }
 
+    @Getter
+    @ToString(callSuper = true)
+    public static class DisconnectMessageBody extends MessageBody {
+        private final String username;
+
+        public DisconnectMessageBody(String username) {
+            super(BodyType.DISCONNECT);
+            this.username = username;
+        }
+    }
+
+    @Getter
+    @ToString(callSuper = true)
+    public static class ReconnectMessageBody extends MessageBody {
+        private final String username;
+
+        public ReconnectMessageBody(String username) {
+            super(BodyType.RECONNECT);
+            this.username = username;
+        }
     }
 }

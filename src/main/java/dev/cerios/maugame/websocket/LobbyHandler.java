@@ -4,6 +4,7 @@ import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
+import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.websocket.exception.LobbyAlreadyExistsException;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
 import dev.cerios.maugame.websocket.message.ServerMessage;
@@ -38,7 +39,7 @@ public class LobbyHandler {
 
     private final Lock lock = new ReentrantLock();
 
-    public String registerToNewPublicLobby(String username, String lobbyName) throws GameException, LobbyAlreadyExistsException {
+    public Player registerToNewPublicLobby(String username, String lobbyName) throws GameException, LobbyAlreadyExistsException {
         try {
             lock.lock();
             if (lobbiesQueueReferences.containsKey(lobbyName) || privateLobbies.containsKey(lobbyName)) {
@@ -53,7 +54,7 @@ public class LobbyHandler {
         }
     }
 
-    public String registerToNewPrivateLobby(String username, String lobbyName) throws GameException, LobbyAlreadyExistsException {
+    public Player registerToNewPrivateLobby(String username, String lobbyName) throws GameException, LobbyAlreadyExistsException {
         try {
             lock.lock();
             if (lobbiesQueueReferences.containsKey(lobbyName) || privateLobbies.containsKey(lobbyName)) {
@@ -67,7 +68,7 @@ public class LobbyHandler {
         }
     }
 
-    public String registerPlayerToExistingLobby(String username, String lobbyName) throws GameException, NotFoundException {
+    public Player registerPlayerToExistingLobby(String username, String lobbyName) throws GameException, NotFoundException {
         try {
             lock.lock();
             var game = privateLobbies.get(lobbyName);
@@ -84,7 +85,7 @@ public class LobbyHandler {
         }
     }
 
-    public String registerPlayerToRandomLobby(String username) throws GameException {
+    public Player registerPlayerToRandomLobby(String username) throws GameException {
         try {
             lock.lock();
             var game = getOrCreateGame();
@@ -136,13 +137,17 @@ public class LobbyHandler {
         }
     }
 
-    public void removePlayer(String sessionId) {
+    /**
+     * if possible removes player from lobby
+     * @param playerId
+     * @return whether player removed from lobby
+     */
+    public boolean removePlayer(String playerId) {
         try {
             lock.lock();
-            var playerId = storage.removePlayerBySession(sessionId);
             var playerData = players.remove(playerId);
             if (playerData == null) {
-                return;
+                return false;
             }
             var game = playerData.game();
 
@@ -158,9 +163,8 @@ public class LobbyHandler {
                     it.remove();
                 } else {
                     if (gd.val3().setReady(false)) {
-                        for (var anotherGd : gameData) {
+                        for (var anotherGd : gameData)
                             distributor.enqueueMessage(anotherGd.val1(), ServerMessage.ofUnready(gd.val2()));
-                        }
                     }
                 }
             }
@@ -171,19 +175,22 @@ public class LobbyHandler {
 
             try {
                 game.removePlayer(playerId);
+                storage.removePlayerById(playerId);
             } catch (GameException e) {
                 throw new RuntimeException(e);
             }
 
             gameQueue.putIfAbsent(game.getUuid(), game);
+            return true;
         } finally {
             lock.unlock();
         }
     }
 
-    private String registerPlayer(String username, Game game, String lobbyName) throws GameException {
-        var playerId = game.registerPlayer(username, messageDistributor::distribute);
+    private Player registerPlayer(String username, Game game, String lobbyName) throws GameException {
+        var player = game.registerPlayer(username, messageDistributor::distribute);
         var ready = new ReadyState();
+        var playerId = player.getPlayerId();
         players.put(playerId, new PlayerData(username, ready, game, lobbyName));
         var gameData = games.computeIfAbsent(game.getUuid(), k -> new LinkedList<>());
 
@@ -198,7 +205,7 @@ public class LobbyHandler {
         gameData.add(new Group3<>(playerId, username, ready));
 
         if (game.getFreeCapacity() > 0)
-            return playerId;
+            return player;
 
         if (lobbyName == null)
             gameQueue.pollFirstEntry();
@@ -211,7 +218,7 @@ public class LobbyHandler {
             }
         }
 
-        return playerId;
+        return player;
     }
 
     private Game getOrCreateGame() {

@@ -59,4 +59,19 @@ public class TestClient extends StandardWebSocketClient {
             throw new RuntimeException(e);
         }
     }
+
+    public static String createConnectionUri(int port, String username) {
+        return String.format("ws://localhost:%d/game?user=%s", port, username);
+    }
+
+    public static String createConnectionUri(int port, String username, String lobbyName, boolean isNew, boolean isPrivate) {
+        return String.format(
+                "ws://localhost:%d/game?user=%s&lobby=%s&new=%s&private=%s",
+                port,
+                username,
+                lobbyName,
+                isNew,
+                isPrivate
+        );
+    }
 }
