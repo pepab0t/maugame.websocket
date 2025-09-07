@@ -76,10 +76,16 @@ public class PlayerSessionStorage {
     }
 
     public void registerSession(Player player, WebSocketSession session) {
-        var sessionFuture = playerToSession.computeIfAbsent(player.getPlayerId(), k -> new CompletableFuture<>());
+        var sessionFuture = playerToSession.computeIfAbsent(player.getPlayerId(), __ -> new CompletableFuture<>());
         sessionToPlayer.put(session.getId(), player);
-        playerLocks.putIfAbsent(player.getPlayerId(), PlayerConcurrentSources.create());
+        playerLocks.computeIfAbsent(player.getPlayerId(), __ -> PlayerConcurrentSources.create());
         sessionFuture.complete(session);
+    }
+
+    public void registerReplaceSession(Player player, WebSocketSession session) {
+        playerToSession.put(player.getPlayerId(), CompletableFuture.completedFuture(session));
+        sessionToPlayer.put(session.getId(), player);
+        playerLocks.put(player.getPlayerId(), PlayerConcurrentSources.create());
     }
 
     public void registerGame(String playerId, Game game) {

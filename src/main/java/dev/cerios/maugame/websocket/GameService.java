@@ -56,7 +56,7 @@ public class GameService {
     public void reconnectPlayer(String username, WebSocketSession session, String playerId) throws NotFoundException {
         try {
             var game = storage.getGame(playerId).orElseThrow(() -> new NotFoundException("Game not found for given player."));
-            storage.registerSession(game.getPlayer(playerId), session);
+            storage.registerReplaceSession(game.getPlayer(playerId), session);
             game.sendCurrentStateTo(playerId, p -> p.getUsername().equals(username));
             for (var p : game.getAllPlayers()) {
                 var otherId = p.getPlayerId();

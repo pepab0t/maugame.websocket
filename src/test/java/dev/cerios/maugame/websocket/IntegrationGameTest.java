@@ -7,8 +7,6 @@ import org.json.JSONException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +18,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -222,12 +221,18 @@ public class IntegrationGameTest {
                     m -> m.contains("ACTION"),
                     TIMEOUT_MS
             );
-            Thread.sleep(200);
             sessionReconnect = clientReconnect.handshake().join();
+            var reconnectedMessages = clientReconnect.get(7);
 
-            Thread.sleep(200);
-
-            clientReconnect.getReceivedMessages().forEach(System.out::println);
+            // then
+            var drawOptions = Set.of("HIDDEN_DRAW", "DRAW");
+            assertThat(JsonPath.<String>read(reconnectedMessages.get(0), "$.action.type")).isEqualTo("START_GAME");
+            assertThat(JsonPath.<String>read(reconnectedMessages.get(1), "$.action.type")).isEqualTo("START_PILE");
+            assertThat(JsonPath.<String>read(reconnectedMessages.get(2), "$.action.type")).isIn(drawOptions);
+            assertThat(JsonPath.<String>read(reconnectedMessages.get(3), "$.action.type")).isIn(drawOptions);
+            assertThat(JsonPath.<String>read(reconnectedMessages.get(4), "$.action.type")).isIn(drawOptions);
+            assertThat(JsonPath.<String>read(reconnectedMessages.get(5), "$.action.type")).isEqualTo("PLAYER_SHIFT");
+            assertThat(JsonPath.<String>read(reconnectedMessages.get(6), "$.action.type")).isEqualTo("PLAYER_RANK");
         } finally {
             var it = Stream.of(session1, session2, session3, sessionReconnect)
                     .filter(Objects::nonNull).iterator();
