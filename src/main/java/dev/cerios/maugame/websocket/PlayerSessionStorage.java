@@ -122,6 +122,13 @@ public class PlayerSessionStorage {
         playerToGame.remove(playerId);
     }
 
+    public void clear() {
+        playerToSession.clear();
+        playerToGame.clear();
+        sessionToPlayer.clear();
+        playerLocks.clear();
+    }
+
     public record PlayerConcurrentSources(Lock lock, Queue<Runnable> queue) {
         public static PlayerConcurrentSources create() {
             return new PlayerConcurrentSources(new ReentrantLock(), new ConcurrentLinkedQueue<>());

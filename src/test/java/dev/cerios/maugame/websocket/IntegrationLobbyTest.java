@@ -10,11 +10,14 @@ import org.json.JSONException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -33,7 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-        //@TestMethodOrder(MethodOrderer.Random.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class IntegrationLobbyTest {
 
     @LocalServerPort
@@ -50,6 +53,8 @@ class IntegrationLobbyTest {
 
     @Autowired
     private MauSettings mauSettings;
+    @Autowired
+    private PlayerSessionStorage playerSessionStorage;
 
     @BeforeEach
     void setUp() {
@@ -60,6 +65,7 @@ class IntegrationLobbyTest {
     @AfterEach
     void tearDown() {
         lobbyHandler.clear();
+        playerSessionStorage.clear();
     }
 
     @Test
@@ -531,7 +537,7 @@ class IntegrationLobbyTest {
     }
 
     @Test
-    void shouldRegisterToExistingPrivateLobby() throws IOException {
+    void shouldRegisterToExistingPrivateLobby() throws IOException, InterruptedException {
         // given
         final var lobbyName = "private_lobby";
         final Predicate<String> registerMatcher = m -> m.contains("REGISTER_PLAYER");
