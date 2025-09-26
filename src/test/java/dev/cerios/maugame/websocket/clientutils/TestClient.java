@@ -3,6 +3,8 @@ package dev.cerios.maugame.websocket.clientutils;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
@@ -30,6 +32,7 @@ public class TestClient extends StandardWebSocketClient {
 
     /**
      * Perform websocket handshake and waits for first websocket message.
+     *
      * @return future with opened session
      */
     public CompletableFuture<WebSocketSession> handshakeWithCatch() {
@@ -58,5 +61,30 @@ public class TestClient extends StandardWebSocketClient {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static String createConnectionUri(int port, String username) {
+        return String.format("ws://localhost:%d/game?user=%s", port, username);
+    }
+
+    public static String createConnectionUri(int port, String username, String lobbyName, boolean isNew, boolean isPrivate) {
+        return String.format(
+                "ws://localhost:%d/game?user=%s&lobby=%s&new=%s&private=%s",
+                port,
+                username,
+                lobbyName,
+                isNew,
+                isPrivate
+        );
+    }
+
+    public static Predicate<String> createMessageMatcher(Collection<String> containsOneOf) {
+        return message -> containsOneOf.stream()
+                .map(word -> "\"" + word + "\"")
+                .anyMatch(message::contains);
+    }
+
+    public static Predicate<String> createMessageMatcher(String... containsOneOf) {
+        return createMessageMatcher(Arrays.asList(containsOneOf));
     }
 }

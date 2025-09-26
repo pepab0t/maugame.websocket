@@ -29,7 +29,8 @@ public class RequestProcessor {
     private final MessageDistributor distributor;
 
     public void process(String sessionId, String request) {
-        var playerId = storage.getPlayer(sessionId);
+        var player = storage.getPlayer(sessionId);
+        var playerId = player.getPlayerId();
         try {
             JsonNode root = objectMapper.readTree(request);
             var requestType = objectMapper.convertValue(root.get("requestType"), RequestType.class);

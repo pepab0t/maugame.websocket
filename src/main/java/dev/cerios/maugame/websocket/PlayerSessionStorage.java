@@ -2,6 +2,8 @@ package dev.cerios.maugame.websocket;
 
 import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.game.Game;
+import dev.cerios.maugame.mauengine.game.Player;
+import dev.cerios.maugame.mauengine.game.Stage;
 import dev.cerios.maugame.websocket.exception.MauTimeoutException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,7 +23,7 @@ import java.util.stream.Collectors;
 public class PlayerSessionStorage {
 
     private final Map<String, CompletableFuture<WebSocketSession>> playerToSession = new ConcurrentHashMap<>();
-    private final Map<String, String> sessionToPlayer = new ConcurrentHashMap<>();
+    private final Map<String, Player> sessionToPlayer = new ConcurrentHashMap<>();
     private final Map<String, Game> playerToGame = new ConcurrentHashMap<>();
 
     private final Map<String, PlayerConcurrentSources> playerLocks = new ConcurrentHashMap<>();
@@ -42,23 +44,24 @@ public class PlayerSessionStorage {
                 .map(cf -> cf.getNow(null));
     }
 
-    public String getPlayer(String sessionId) {
-        var playerId = sessionToPlayer.get(sessionId);
-        if (playerId == null) {
+    public Player getPlayer(String sessionId) {
+        var player = sessionToPlayer.get(sessionId);
+        if (player == null) {
             throw new RuntimeException("Unexpected error: player should exist for session " + sessionId);
         }
-        return playerId;
+        return player;
     }
 
     public PlayerConcurrentSources getPlayerSources(String playerId) {
         return playerLocks.computeIfAbsent(playerId, ignore -> PlayerConcurrentSources.create());
     }
 
-    private String dropSession(String sessionId) {
-        var playerId = sessionToPlayer.remove(sessionId);
-        if (playerId == null) {
+    private Player dropSession(String sessionId) {
+        var player = sessionToPlayer.remove(sessionId);
+        if (player == null) {
             throw new IllegalStateException("Unexpected error: player does not exist for session " + sessionId);
         }
+        var playerId = player.getPlayerId();
         Optional.ofNullable(playerToSession.remove(playerId))
                 .map(future -> future.getNow(null))
                 .ifPresent(session -> {
@@ -69,15 +72,20 @@ public class PlayerSessionStorage {
                     }
                 });
         playerLocks.remove(playerId);
-        return playerId;
+        return player;
     }
 
-    public void registerSession(String playerId, WebSocketSession session) {
-        var sessionFuture = playerToSession.computeIfAbsent(playerId, k -> new CompletableFuture<>());
-        sessionToPlayer.put(session.getId(), playerId);
-        playerLocks.putIfAbsent(playerId, PlayerConcurrentSources.create());
+    public void registerSession(Player player, WebSocketSession session) {
+        var sessionFuture = playerToSession.computeIfAbsent(player.getPlayerId(), __ -> new CompletableFuture<>());
+        sessionToPlayer.put(session.getId(), player);
+        playerLocks.computeIfAbsent(player.getPlayerId(), __ -> PlayerConcurrentSources.create());
         sessionFuture.complete(session);
-        log.debug("registered session {} with player {}", session.getId(), playerId);
+    }
+
+    public void registerReplaceSession(Player player, WebSocketSession session) {
+        playerToSession.put(player.getPlayerId(), CompletableFuture.completedFuture(session));
+        sessionToPlayer.put(session.getId(), player);
+        playerLocks.put(player.getPlayerId(), PlayerConcurrentSources.create());
     }
 
     public void registerGame(String playerId, Game game) {
@@ -88,22 +96,21 @@ public class PlayerSessionStorage {
         return Optional.ofNullable(playerToGame.get(playerId));
     }
 
-    public String removePlayerBySession(String sessionId) {
-        var playerId = dropSession(sessionId);
+    public Player removePlayerBySession(String sessionId) {
+        var player = dropSession(sessionId);
+        var playerId = player.getPlayerId();
         Optional.ofNullable(playerToGame.get(playerId))
                 .ifPresent(game -> {
                     try {
-                        switch (game.getStage()) {
-                            case LOBBY, FINISH -> {
-                                game.removePlayer(playerId);
-                                playerToGame.remove(playerId);
-                            }
+                        if (game.getStage() == Stage.FINISH) {
+                            game.removePlayer(playerId);
+                            playerToGame.remove(playerId);
                         }
                     } catch (GameException e) {
                         throw new IllegalStateException(e);
                     }
                 });
-        return playerId;
+        return player;
     }
 
     public void removePlayerById(String playerId) {
@@ -119,6 +126,13 @@ public class PlayerSessionStorage {
                 });
         playerLocks.remove(playerId);
         playerToGame.remove(playerId);
+    }
+
+    public void clear() {
+        playerToSession.clear();
+        playerToGame.clear();
+        sessionToPlayer.clear();
+        playerLocks.clear();
     }
 
     public record PlayerConcurrentSources(Lock lock, Queue<Runnable> queue) {
