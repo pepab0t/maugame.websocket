@@ -10,10 +10,10 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-	<artifactId>maugame-server</artifactId>
+	<artifactId>server</artifactId>
     <packaging>jar</packaging> <!-- make this explicit -->
 
-    <name>maugame-server</name>
+    <name>game-server</name>
 	<description>server for mau mau game</description>
 
     <dependencyManagement>

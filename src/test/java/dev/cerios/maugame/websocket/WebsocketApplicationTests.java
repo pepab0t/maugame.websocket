@@ -1,6 +1,6 @@
 package dev.cerios.maugame.websocket;
 
-import dev.cerios.maugame.mauengine.game.Player;
+import dev.cerios.maugame.mauengine.player.Player;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

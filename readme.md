@@ -89,15 +89,15 @@ and possible query parameters:
 
 ## Messages
 
-### type: __SERVER_MESSAGE__
+### type: __ACTION__
 
 #### Ready/Unready
 
 ```json
 {
-  "messageType": "SERVER_MESSAGE",
-  "body": {
-    "bodyType": "READY",
+  "messageType": "ACTION",
+  "action": {
+    "type": "READY",
     "username": "joe"
   }
 }
@@ -105,9 +105,9 @@ and possible query parameters:
 
 ```json
 {
-  "messageType": "SERVER_MESSAGE",
-  "body": {
-    "bodyType": "UNREADY",
+  "messageType": "ACTION",
+  "action": {
+    "type": "UNREADY",
     "username": "joe"
   }
 }

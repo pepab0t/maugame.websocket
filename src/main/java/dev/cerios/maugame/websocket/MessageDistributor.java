@@ -2,7 +2,7 @@ package dev.cerios.maugame.websocket;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.cerios.maugame.mauengine.game.Player;
+import dev.cerios.maugame.mauengine.game.GamePlayer;
 import dev.cerios.maugame.mauengine.game.action.*;
 import dev.cerios.maugame.websocket.dto.action.ActionDto;
 import dev.cerios.maugame.websocket.exception.MauTimeoutException;
@@ -17,8 +17,6 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import static dev.cerios.maugame.websocket.PlayerSessionStorage.PlayerConcurrentSources;
 
 @Component
 @Slf4j
@@ -38,7 +36,7 @@ public class MessageDistributor {
         this.actionMapper = actionMapper;
     }
 
-    public void distribute(Player player, Action action) {
+    public void distribute(GamePlayer player, Action action) {
         try {
             lock.lock();
             var ps = storage.getPlayerSources(player.getPlayerId());
@@ -69,6 +67,8 @@ public class MessageDistributor {
                             session -> {
                                 try {
                                     session.sendMessage(new TextMessage(objectMapper.writeValueAsString(message)));
+                                } catch (IllegalStateException e) {
+                                    log.info("error while sending message to session {}", session.getId());
                                 } catch (IOException e) {
                                     log.info("Message {} could not be serialized.", message, e);
                                 }
@@ -140,6 +140,9 @@ public class MessageDistributor {
             case StartPileAction a -> actionMapper.toDto(a);
             case WinAction a -> actionMapper.toDto(a);
             case DisqualifiedAction a -> actionMapper.toDto(a);
+            case ReadyAction a -> actionMapper.toDto(a);
+            case UnreadyAction a -> actionMapper.toDto(a);
+            case DestroyAction a -> actionMapper.toDto(a);
             default -> throw new IllegalStateException("Unexpected value: " + action);
         };
     }

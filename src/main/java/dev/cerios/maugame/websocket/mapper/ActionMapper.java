@@ -1,7 +1,6 @@
 package dev.cerios.maugame.websocket.mapper;
 
 import dev.cerios.maugame.mauengine.card.CardType;
-import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.mauengine.game.action.*;
 import dev.cerios.maugame.websocket.dto.action.*;
 import dev.cerios.maugame.websocket.dto.player.PlayerDto;
@@ -66,6 +65,12 @@ public abstract class ActionMapper {
 
     @Mapping(target = "playerDto", expression = "java(playerMapper.toPublicDto(action.player()))")
     public abstract PlayerActionDto toDto(WinAction action);
+
+    public abstract ReadyActionDto toDto(ReadyAction action);
+
+    public abstract UnreadyActionDto toDto(UnreadyAction action);
+
+    public abstract DestroyActionDto toDto(DestroyAction action);
 
     protected PlayerDto mapRegisterPlayer(RegisterAction action) {
         return action.isMe() ? playerMapper.toPrivateDto(action.player()) : playerMapper.toPublicDto(action.player());

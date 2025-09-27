@@ -1,9 +1,10 @@
 package dev.cerios.maugame.websocket.dto.action;
 
-import dev.cerios.maugame.mauengine.game.action.Action;
 import lombok.Data;
+
+import static dev.cerios.maugame.mauengine.game.action.Action.ActionType;
 
 @Data
 public class ActionDto {
-    private final Action.ActionType type;
+    private final ActionType type;
 }

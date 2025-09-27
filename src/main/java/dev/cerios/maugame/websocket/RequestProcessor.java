@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
 import dev.cerios.maugame.websocket.dto.request.PlayRequestDto;
 import dev.cerios.maugame.websocket.exception.InvalidCommandException;
+import dev.cerios.maugame.websocket.exception.MauTimeoutException;
+import dev.cerios.maugame.websocket.exception.NotFoundException;
 import dev.cerios.maugame.websocket.mapper.ExceptionMapper;
 import dev.cerios.maugame.websocket.request.RequestType;
 import jakarta.validation.Validator;
@@ -24,11 +26,11 @@ public class RequestProcessor {
     private final ExceptionMapper exceptionMapper;
     private final PlayerSessionStorage storage;
     private final GameService gameService;
-    private final LobbyHandler lobbyHandler;
     private final Validator validator;
     private final MessageDistributor distributor;
 
-    public void process(String sessionId, String request) {
+    public void process(String sessionId, String request) throws MauTimeoutException {
+        log.trace("processing request for session {}", sessionId);
         var player = storage.getPlayer(sessionId);
         var playerId = player.getPlayerId();
         try {
@@ -45,7 +47,7 @@ public class RequestProcessor {
                         playerId
                 );
             }
-        } catch (JsonProcessingException | InvalidCommandException | RuntimeException | MauEngineBaseException e) {
+        } catch (Exception e) {
             distributor.enqueueMessage(playerId, exceptionMapper.toErrorResponse(e));
         }
     }
@@ -67,11 +69,11 @@ public class RequestProcessor {
         }
     }
 
-    private void processControl(JsonNode node, String playerId) throws InvalidCommandException, MauEngineBaseException {
+    private void processControl(JsonNode node, String playerId) throws InvalidCommandException, MauEngineBaseException, NotFoundException {
         var controlType = objectMapper.convertValue(node.get("controlType"), RequestType.ControlType.class);
 
         switch (controlType) {
-            case READY -> lobbyHandler.setPlayerReady(playerId);
+            case READY -> gameService.setPlayerReady(playerId);
             default -> throw new InvalidCommandException("Invalid control type");
         }
     }

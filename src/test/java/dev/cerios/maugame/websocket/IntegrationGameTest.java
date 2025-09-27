@@ -36,7 +36,7 @@ public class IntegrationGameTest {
     @Autowired
     private MauSettings settings;
     @Autowired
-    private LobbyHandler lobbyHandler;
+    private GameStorage gameStorage;
     @Autowired
     private PlayerSessionStorage storage;
 
@@ -49,13 +49,13 @@ public class IntegrationGameTest {
 
     @AfterEach
     void tearDown() {
-        lobbyHandler.clear();
+        gameStorage.clear();
         storage.clear();
     }
 
     @Test
     void whenGameStarts_thenShouldReceiveActionsInCorrectOrder() throws IOException {
-        Predicate<String> messageMatcher = createMessageMatcher("READY", "ACTION");
+        Predicate<String> messageMatcher = m -> true;
         // given
         var client1 = new TestClient(
                 TestClient.createConnectionUri(port, "user1"),
@@ -84,15 +84,15 @@ public class IntegrationGameTest {
 
             assertThat(JsonPath.<String>read(actions1.get(0), "$.action.type")).isEqualTo("START_GAME");
             assertThat(JsonPath.<String>read(actions1.get(1), "$.action.type")).isEqualTo("START_PILE");
-            assertThat(JsonPath.<String>read(actions1.get(2), "$.action.type")).isEqualTo("PLAYER_SHIFT");
-            assertThat(JsonPath.<String>read(actions1.get(3), "$.action.type")).isEqualTo("DRAW");
-            assertThat(JsonPath.<String>read(actions1.get(4), "$.action.type")).isEqualTo("HIDDEN_DRAW");
+            assertThat(JsonPath.<String>read(actions1.get(2), "$.action.type")).isEqualTo("DRAW");
+            assertThat(JsonPath.<String>read(actions1.get(3), "$.action.type")).isEqualTo("HIDDEN_DRAW");
+            assertThat(JsonPath.<String>read(actions1.get(4), "$.action.type")).isEqualTo("PLAYER_SHIFT");
 
             assertThat(JsonPath.<String>read(actions2.get(0), "$.action.type")).isEqualTo("START_GAME");
             assertThat(JsonPath.<String>read(actions2.get(1), "$.action.type")).isEqualTo("START_PILE");
-            assertThat(JsonPath.<String>read(actions2.get(2), "$.action.type")).isEqualTo("PLAYER_SHIFT");
-            assertThat(JsonPath.<String>read(actions2.get(3), "$.action.type")).isEqualTo("HIDDEN_DRAW");
-            assertThat(JsonPath.<String>read(actions2.get(4), "$.action.type")).isEqualTo("DRAW");
+            assertThat(JsonPath.<String>read(actions2.get(2), "$.action.type")).isEqualTo("HIDDEN_DRAW");
+            assertThat(JsonPath.<String>read(actions2.get(3), "$.action.type")).isEqualTo("DRAW");
+            assertThat(JsonPath.<String>read(actions2.get(4), "$.action.type")).isEqualTo("PLAYER_SHIFT");
         }
     }
 
