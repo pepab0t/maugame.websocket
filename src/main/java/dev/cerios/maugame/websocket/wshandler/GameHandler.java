@@ -1,9 +1,11 @@
 package dev.cerios.maugame.websocket.wshandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.websocket.GameService;
 import dev.cerios.maugame.websocket.RequestProcessor;
 import dev.cerios.maugame.websocket.exception.InvalidHandshakeException;
+import dev.cerios.maugame.websocket.exception.MauTimeoutException;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
 import dev.cerios.maugame.websocket.exception.ServerException;
 import dev.cerios.maugame.websocket.message.Message;
@@ -36,6 +38,8 @@ public class GameHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession s) {
         final var session = new ConcurrentWebSocketSessionDecorator(s, 10_000, 4096);
 
+        log.debug("established session: {}", session.getId());
+
         try {
             var cp = parameterParser.parse(session.getAttributes());
             switch (cp.decideOperation()) {
@@ -43,13 +47,15 @@ public class GameHandler extends TextWebSocketHandler {
                 case CONNECT_CUSTOM -> gameService.registerPlayerToExistingCustomLobby(cp.username(), session, cp.lobbyName().get());
                 case CREATE -> gameService.registerPlayerToNewCustomLobby(cp.username(), session, cp.lobbyName().get(), cp.isPrivate());
                 case RECONNECT -> gameService.reconnectPlayer(cp.username(), session, cp.playerId().get());
+                default -> throw new ServerException("Unknown operation");
             }
-        } catch (ServerException e) {
+            log.debug("init complete session: {}", session.getId());
+        } catch (ServerException | GameException e) {
             try {
                 session.sendMessage(new TextMessage(objectMapper.writeValueAsString(Message.createErrorMessage(e))));
                 session.close();
             } catch (IOException ex) {
-                log.warn("Error interacting with session", ex);
+                log.warn("error send message", ex);
             }
         }
     }
@@ -58,12 +64,22 @@ public class GameHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         try {
             gameService.disconnectPlayer(session.getId());
-        } catch (Exception ignore) {
+        } catch (Exception e) {
+            log.trace("error disconnect player", e);
         }
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
-        processor.process(session.getId(), message.getPayload());
+        try {
+            processor.process(session.getId(), message.getPayload());
+        } catch (MauTimeoutException e) {
+            try {
+                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(Message.createErrorMessage(e))));
+                session.close();
+            } catch (IOException ex) {
+                log.warn("error send message", ex);
+            }
+        }
     }
 }

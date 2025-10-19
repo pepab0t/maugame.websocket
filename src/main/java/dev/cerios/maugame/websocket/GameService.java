@@ -4,7 +4,7 @@ import dev.cerios.maugame.mauengine.card.Card;
 import dev.cerios.maugame.mauengine.card.Color;
 import dev.cerios.maugame.mauengine.exception.GameException;
 import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
-import dev.cerios.maugame.mauengine.game.Player;
+import dev.cerios.maugame.mauengine.game.GamePlayer;
 import dev.cerios.maugame.websocket.exception.LobbyAlreadyExistsException;
 import dev.cerios.maugame.websocket.exception.NotFoundException;
 import dev.cerios.maugame.websocket.message.ServerMessage;
@@ -18,24 +18,23 @@ import org.springframework.web.socket.WebSocketSession;
 @Slf4j
 public class GameService {
     private final PlayerSessionStorage storage;
-    private final LobbyHandler lobbyHandler;
     private final MessageDistributor distributor;
+    private final GameStorage gameStorage;
 
-    public void registerPlayerToNewCustomLobby(String username, WebSocketSession session, String lobbyName, boolean isPrivate) throws LobbyAlreadyExistsException {
-        try {
-            var player = isPrivate ?
-                    lobbyHandler.registerToNewPrivateLobby(username, lobbyName) :
-                    lobbyHandler.registerToNewPublicLobby(username, lobbyName);
-            storage.registerSession(player, session);
-            logPlayerAssignment(player, session);
-        } catch (GameException e) {
-            throw new RuntimeException(e);
-        }
+    public void registerPlayerToNewCustomLobby(
+            String username,
+            WebSocketSession session,
+            String gameName,
+            boolean isPrivate
+    ) throws LobbyAlreadyExistsException {
+        var player = gameStorage.registerToNew(username, gameName, isPrivate);
+        storage.registerSession(player, session);
+        logPlayerAssignment(player, session);
     }
 
     public void registerPlayerToExistingCustomLobby(String username, WebSocketSession session, String lobbyName) throws NotFoundException {
         try {
-            var player = lobbyHandler.registerPlayerToExistingLobby(username, lobbyName);
+            var player = gameStorage.registerToNamed(username, lobbyName);
             storage.registerSession(player, session);
             logPlayerAssignment(player, session);
         } catch (GameException e) {
@@ -43,14 +42,9 @@ public class GameService {
         }
     }
 
-    public void registerPlayer(String username, WebSocketSession session) {
-        try {
-            var player = lobbyHandler.registerPlayerToRandomLobby(username);
-            storage.registerSession(player, session);
-            logPlayerAssignment(player, session);
-        } catch (GameException e) {
-            throw new RuntimeException(e);
-        }
+    public void registerPlayer(String username, WebSocketSession session) throws GameException {
+        var player = gameStorage.registerToRandom(username);
+        storage.registerSession(player, session);
     }
 
     public void reconnectPlayer(String username, WebSocketSession session, String playerId) throws NotFoundException {
@@ -72,10 +66,15 @@ public class GameService {
     }
 
     public void disconnectPlayer(String sessionId) {
-        final var player = storage.removePlayerBySession(sessionId);
-        final var playerId = player.getPlayerId();
-        if (!lobbyHandler.removePlayer(playerId)) {
-            storage.getGame(playerId).ifPresent(game -> {
+        var pair = storage.removePlayerBySession(sessionId);
+        var player = pair.player();
+        var gameOpt = pair.game();
+        if (gameOpt.isPresent()) {
+            var game = gameOpt.get();
+            if (game.getPlayerCount() == 0) {
+                gameStorage.remove(game.getId());
+            } else {
+                var playerId = player.getPlayerId();
                 var disconnectMessage = ServerMessage.ofDisconnect(player.getUsername());
                 for (var otherPlayer : game.getAllPlayers()) {
                     if (otherPlayer.getPlayerId().equals(playerId)) {
@@ -83,8 +82,16 @@ public class GameService {
                     }
                     distributor.enqueueMessage(otherPlayer.getPlayerId(), disconnectMessage);
                 }
-            });
+            }
         }
+    }
+
+    public void setPlayerReady(String playerId) throws NotFoundException, GameException {
+        var gameOpt = storage.getGame(playerId);
+        if (gameOpt.isEmpty()) {
+            throw new NotFoundException("Game not found for given player.");
+        }
+        gameOpt.get().setReady(playerId);
     }
 
     public void playCard(String playerId, Card card, Color nextColor) throws MauEngineBaseException {
@@ -102,7 +109,7 @@ public class GameService {
         game.playPassMove(playerId);
     }
 
-    private void logPlayerAssignment(Player player, WebSocketSession session) {
+    private void logPlayerAssignment(GamePlayer player, WebSocketSession session) {
         log.info("player `{}` assigned to session `{}`", player, session.getId());
     }
 }

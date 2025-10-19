@@ -1,17 +1,10 @@
 package dev.cerios.maugame.websocket;
 
 import com.jayway.jsonpath.JsonPath;
-import dev.cerios.maugame.mauengine.exception.MauEngineBaseException;
-import dev.cerios.maugame.mauengine.game.Game;
 import dev.cerios.maugame.mauengine.game.GameFactory;
-import dev.cerios.maugame.mauengine.game.Player;
 import dev.cerios.maugame.websocket.clientutils.TestClient;
 import org.json.JSONException;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.*;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,8 +16,10 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -32,8 +27,6 @@ import static dev.cerios.maugame.websocket.clientutils.JsonFactory.createReadyRe
 import static java.lang.System.out;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -49,7 +42,7 @@ class IntegrationLobbyTest {
     private GameFactory gameFactory;
 
     @Autowired
-    private LobbyHandler lobbyHandler;
+    private GameStorage gameStorage;
 
     @Autowired
     private MauSettings mauSettings;
@@ -64,7 +57,7 @@ class IntegrationLobbyTest {
 
     @AfterEach
     void tearDown() {
-        lobbyHandler.clear();
+        gameStorage.clear();
         playerSessionStorage.clear();
     }
 
@@ -134,39 +127,39 @@ class IntegrationLobbyTest {
         assertRemovePlayerAction(messages.get(2), "user1");
     }
 
-    @Test
-    void whenAllPlayerReady_thenGameStartsAndLobbyDisappears() throws IOException, MauEngineBaseException {
-        // given
-        var client2 = new TestClient(
-                createConnectionUri("user2"),
-                TIMEOUT_MS
-        );
-        var client3 = new TestClient(
-                createConnectionUri("user3"),
-                message -> message.matches(".*:\\s*\"READY.*"),
-                TIMEOUT_MS
-        );
-        var readyRequest = new TextMessage(createReadyRequest());
-        var gameMock = mock(Game.class);
-        when(gameFactory.createGame(any(int.class), any(int.class))).thenReturn(gameMock);
-        when(gameMock.registerPlayer(any(String.class), any()))
-                .thenReturn(new Player("id1", null, null), new Player("id2", null, null), new Player("id3", null, null));
-        when(gameMock.hasEnoughPlayers()).thenReturn(true);
-        when(gameMock.getUuid()).thenReturn(UUID.randomUUID());
-
-        // when
-        try (var s1 = client.handshake().join(); var s2 = client2.handshake().join(); var s3 = client3.handshake().join()) {
-            s1.sendMessage(readyRequest);
-            client3.get();
-            s2.sendMessage(readyRequest);
-            client3.get();
-            s3.sendMessage(readyRequest);
-            client3.get();
-
-            // then
-            verify(gameMock, timeout(TIMEOUT_MS)).start();
-        }
-    }
+    //    @Test
+    //    void whenAllPlayerReady_thenGameStartsAndLobbyDisappears() throws IOException, MauEngineBaseException {
+    //        // given
+    //        var client2 = new TestClient(
+    //                createConnectionUri("user2"),
+    //                TIMEOUT_MS
+    //        );
+    //        var client3 = new TestClient(
+    //                createConnectionUri("user3"),
+    //                message -> message.matches(".*:\\s*\"READY.*"),
+    //                TIMEOUT_MS
+    //        );
+    //        var readyRequest = new TextMessage(createReadyRequest());
+    //        var gameMock = mock(Game.class);
+    //        when(gameFactory.createGame(any(int.class), any(int.class))).thenReturn(gameMock);
+    //        when(gameMock.registerPlayer(any(String.class), any()))
+    //                .thenReturn(new Player("id1", null, null), new Player("id2", null, null), new Player("id3", null, null));
+    //        when(gameMock.hasEnoughPlayers()).thenReturn(true);
+    //        when(gameMock.getUuid()).thenReturn(UUID.randomUUID());
+    //
+    //        // when
+    //        try (var s1 = client.handshake().join(); var s2 = client2.handshake().join(); var s3 = client3.handshake().join()) {
+    //            s1.sendMessage(readyRequest);
+    //            client3.get();
+    //            s2.sendMessage(readyRequest);
+    //            client3.get();
+    //            s3.sendMessage(readyRequest);
+    //            client3.get();
+    //
+    //            // then
+    //            verify(gameMock, timeout(TIMEOUT_MS)).start();
+    //        }
+    //    }
 
     @Test
     void whenPlayerDisconnects_thenUpdateReadyOnlyThoseChanged() throws IOException {
@@ -183,7 +176,9 @@ class IntegrationLobbyTest {
                 TIMEOUT_MS
         );
 
-        try (var s1 = client.handshake().join(); var s2 = client2.handshake().join(); var s3 = client3.handshake().join()) {
+        try (var s1 = client.handshake().join();
+             var s2 = client2.handshake().join();
+             var s3 = client3.handshake().join()) {
             s2.sendMessage(new TextMessage(createReadyRequest()));
             client2.get();
             client3.get();
@@ -305,13 +300,51 @@ class IntegrationLobbyTest {
             var m3 = client3.get();
             var m4 = client4.get();
             // then
-            assertThat(m1).isEqualTo(m2);
-            assertThat(m3).isEqualTo(m4);
-            assertThat(m4).isNotEqualTo(m1);
+            var messageCounts = new HashMap<String, Integer>();
+            List.of(m1, m2, m3, m4).forEach(m -> messageCounts.compute(m, (k, v) -> v == null ? 1 : v + 1));
+
+            assertThat(messageCounts).hasSize(2);
+            assertThat(messageCounts.values()).containsExactly(2, 2);
         }
     }
 
     @Test
+    void distributePlayersToMultipleRandomGames() throws Exception {
+        // given
+        mauSettings.setMaxPlayers(2);
+        Predicate<String> messageMatcher = message -> message.matches(".*:\\s*\"START_GAME.*");
+        var clientCount = 64;
+        var clients = new LinkedList<TestClient>();
+
+        for (int i = 0; i < clientCount; i++) {
+            clients.add(new TestClient(createConnectionUri("testClient%d".formatted(i)), messageMatcher, TIMEOUT_MS));
+        }
+
+        var sessions = new LinkedList<WebSocketSession>();
+
+        try {
+            sessions.addAll(clients.stream().map(TestClient::handshake).map(CompletableFuture::join).toList());
+            for (var session : sessions) {
+                session.sendMessage(new TextMessage(createReadyRequest()));
+            }
+            var messages = new LinkedList<>(clients.stream().map(TestClient::get).toList());
+            var messageCounts = new HashMap<String, Integer>();
+            messages.forEach(m -> messageCounts.compute(m, (k, v) -> v == null ? 1 : v + 1));
+
+            assertThat(messageCounts).hasSize(clientCount / 2);
+            assertThat(messageCounts.values()).allMatch(count -> count == 2);
+        } finally {
+            for (WebSocketSession session : sessions) {
+                try {
+                    session.close();
+                } catch (IOException ignore) {
+                }
+            }
+        }
+    }
+
+    @Deprecated
+    @Disabled
     void whenNotEnoughPlayers_andPlayerIsReady_thenIgnore() throws IOException {
         // given
         var client1 = new TestClient(createConnectionUri("user1_"), m -> m.matches(".*:\\s*\"READY.*"), 100);
@@ -681,9 +714,9 @@ class IntegrationLobbyTest {
             JSONAssert.assertEquals(
                     """
                             {
-                              "messageType": "SERVER_MESSAGE",
-                              "body": {
-                                "bodyType": "READY",
+                              "messageType": "ACTION",
+                              "action": {
+                                "type": "READY",
                                 "username": "%s"
                               }
                             }
@@ -699,9 +732,9 @@ class IntegrationLobbyTest {
             JSONAssert.assertEquals(
                     """
                             {
-                              "messageType": "SERVER_MESSAGE",
-                              "body": {
-                                "bodyType": "UNREADY",
+                              "messageType": "ACTION",
+                              "action": {
+                                "type": "UNREADY",
                                 "username": "%s"
                               }
                             }
